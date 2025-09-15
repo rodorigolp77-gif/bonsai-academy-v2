@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db } from '../../firebaseConfig'; // USE ESTA LINHA (note o `../../`)
+
 import bonsaiLogo from '../assets/bonsai_logo.png';
 
 const SECURITY_PASSWORD = 'somosem5';

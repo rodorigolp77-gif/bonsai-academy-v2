@@ -1,0 +1,92 @@
+/* src/components/GerenciarResultados.css */
+
+.manager-container {
+    padding: 20px;
+    max-width: 800px;
+    margin: 20px auto;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    border: 2px solid #FFD700;
+    color: white;
+    position: relative;
+}
+
+.back-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background-color: #333;
+    color: #FFD700;
+    border: 1px solid #FFD700;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.manager-title {
+    color: #FFD700;
+    text-align: center;
+    margin-bottom: 30px;
+    padding-top: 40px;
+}
+
+.form-container, .list-container {
+    background-color: rgba(0,0,0,0.2);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+}
+
+.section-title {
+    border-bottom: 2px solid #FFD700;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.manager-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #333;
+    color: white;
+    box-sizing: border-box;
+    font-size: 1em;
+}
+
+.save-button {
+    width: 100%;
+    padding: 12px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.manager-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.manager-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.item-details { flex-grow: 1; }
+.item-title { margin: 0; font-weight: bold; font-size: 1.2em; color: #FFD700; }
+.item-meta { margin: 5px 0; color: #ccc; font-size: 0.9em; }
+.delete-button { background-color: transparent; color: #dc3545; border: none; cursor: pointer; font-size: 1.5em; }
+.error-message { color: #dc3545; text-align: center; margin: 15px 0; }

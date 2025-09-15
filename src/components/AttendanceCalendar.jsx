@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; // Estilo padrão do calendário
-import { db } from '../firebaseConfig';
+import { db } from '../../firebaseConfig'; // USE ESTA LINHA (note o `../../`)
+
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import bonsaiLogo from '../assets/bonsai_logo.png'; // Importa o logo
 
 const AttendanceCalendar = ({ student }) => {
     const [attendanceDates, setAttendanceDates] = useState([]);
@@ -54,8 +54,7 @@ const AttendanceCalendar = ({ student }) => {
                     date.getDate() === attendanceDate.getDate()
             );
             if (isAttended) {
-                // ADICIONADO: 'has-bonsai-logo' para aplicar o logo via CSS
-                return 'attended-day has-bonsai-logo'; 
+                return 'attended-day'; // Nome da classe CSS para estilizar
             }
         }
         return null;
@@ -89,10 +88,8 @@ const AttendanceCalendar = ({ student }) => {
                         border-radius: 8px;
                         color: white;
                     }
-                    /* ADICIONADO: `position: relative` para permitir posicionamento absoluto de pseudo-elementos */
                     .react-calendar__tile {
                         color: white;
-                        position: relative; 
                     }
                     .react-calendar__tile:enabled:hover,
                     .react-calendar__tile:enabled:focus {
@@ -116,22 +113,6 @@ const AttendanceCalendar = ({ student }) => {
                         color: black !important;
                         border-radius: 50%;
                         font-weight: bold;
-                    }
-                    /* NOVO ESTILO: Para adicionar o logo como pseudo-elemento */
-                    .has-bonsai-logo::after {
-                        content: ''; /* Necessário para pseudo-elementos */
-                        display: block;
-                        position: absolute;
-                        bottom: 2px; /* Ajuste a posição vertical conforme necessário */
-                        right: 2px; /* Ajuste a posição horizontal conforme necessário */
-                        width: 18px; /* Tamanho do logo */
-                        height: 18px; /* Tamanho do logo */
-                        background-image: url(${bonsaiLogo}); /* Usa o logo importado */
-                        background-size: contain; /* Redimensiona a imagem para caber */
-                        background-repeat: no-repeat;
-                        background-position: center;
-                        opacity: 0.9; /* Torna o logo ligeiramente transparente */
-                        z-index: 1; /* Garante que o logo esteja acima de outros elementos se houver */
                     }
                 `}
             </style>

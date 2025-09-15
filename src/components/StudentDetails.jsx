@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '../firebaseConfig';
+import { db } from "../firebaseConfig";
 import {
     doc,
     updateDoc,
@@ -10,400 +10,288 @@ import {
     query,
     where,
     getDocs,
-    getDoc
+    getDoc,
+    orderBy
 } from 'firebase/firestore';
-import { FaEdit, FaSave, FaTimes, FaTrashAlt, FaPrint, FaCreditCard, FaSearch } from 'react-icons/fa';
-import bonsaiLogo from '../assets/bonsai_logo.png'; // Importa o logo para a impressão
+import { FaEdit, FaSave, FaTimes, FaTrashAlt, FaPlus, FaCreditCard, FaPrint } from 'react-icons/fa';
+import bonsaiLogo from '../assets/bonsai_logo.png';
+import './StudentDetails.css';
 
-// Opções e dados do formulário de cadastro (ATUALIZADO para incluir traduções japonesas e 'outros')
+// --- Constantes do Formulário ---
 const modalityOptions = [
-    { value: 'jiu-jitsu-kids', label: 'Jiu Jitsu Kids', japanese: '柔術キッズ (Jujutsu kizzu)' },
-    { value: 'jiu-jitsu-feminino', label: 'Jiu Jitsu Feminino', japanese: '女性柔術 (Josei jujutsu)' },
-    { value: 'jiu-jitsu-adulto', label: 'Jiu Jitsu Adulto', japanese: '柔術成人 (Jujutsu seijin)' },
-    { value: 'capoeira', label: 'Capoeira', japanese: 'カポエイラ (Kapoeira)' },
-    { value: 'taekwondo', label: 'Taekwondo', japanese: 'テコンドー (Tekondō)' },
-    { value: 'fitness', label: 'Fitness', japanese: 'フィットネス (Fittonesu)' },
-    { value: 'outros', label: 'Outros', japanese: 'その他 (Sono hoka)' }, 
+    { value: 'jiu-jitsu-kids', label: 'Jiu Jitsu Kids' },
+    { value: 'jiu-jitsu-feminino', label: 'Jiu Jitsu Feminino' },
+    { value: 'jiu-jitsu-adulto', label: 'Jiu Jitsu Adulto' },
+    { value: 'capoeira', label: 'Capoeira' },
+    { value: 'taekwondo', label: 'Taekwondo' },
+    { value: 'fitness', label: 'Fitness' },
+    { value: 'outros', label: 'Outros' },
 ];
 
-const beltOptions = [
-    'branca', 'cinza', 'amarela', 'laranja', 'verde', 'azul', 'roxa', 'marrom', 'preta'
-];
-
+const jiuJitsuBelts = ['branca', 'cinza', 'amarela', 'laranja', 'verde', 'roxa', 'marrom', 'preta'];
+const capoeiraBelts = ['crua', 'amarela', 'laranja', 'azul', 'verde', 'roxa', 'marrom', 'preta'];
 const dueDayOptions = [1, 10, 20, 28];
 
+// --- Início do Componente ---
 const StudentDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+
     const [formData, setFormData] = useState({
-        aluno_id: '',
-        nome: '',
-        data_nascimento: '',
-        data_inicio: '',
-        telefone_1: '',
-        telefone_2: '',
-        email: '',
-        modalidade: [],
-        outros_modalidade_texto: '', 
-        data_registro: '',
-        data_vencimento: '',
-        recebe_whatsapp: false,
-        recebe_line: false,
-        instagram: '',
-        faixa: '',
-        grau: 0,
-        status: '',
-        mensalidade: '',
-        observacoes: '',
-        is_professor: false, 
-        idade: '', 
-        uid: '' 
+        aluno_id: '', nome: '', data_nascimento: '', idade: '', email: '',
+        telefone_1: '', telefone_2: '', instagram: '', recebe_whatsapp: false,
+        recebe_line: false, data_registro: '', data_inicio: '', modalidade: [],
+        outros_modalidade_texto: '', is_professor: false,
+        status: '', mensalidade: '', data_vencimento: '', observacoes: '', uid: '',
+        graduacoes: [],
+        photoUrl: '',
     });
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+
     const [payments, setPayments] = useState([]);
     const [attendance, setAttendance] = useState([]);
-    const [attendanceFilter, setAttendanceFilter] = useState('mensal');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [receiptSearchId, setReceiptSearchId] = useState(''); 
-    const [foundReceipt, setFoundReceipt] = useState(null); 
 
-    const convertTimestampToString = (ts) => {
-        if (ts instanceof Timestamp) {
-            return ts.toDate().toISOString().split('T')[0];
+    const calculateAge = (dateOfBirth) => {
+        const today = new Date();
+        const birth = new Date(dateOfBirth);
+        let calculatedAge = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            calculatedAge--;
         }
-        return '';
+        return calculatedAge;
+    };
+
+    const fetchStudentData = useCallback(async () => {
+        if (!id) {
+            setError("ID do aluno não foi fornecido.");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const studentDocRef = doc(db, 'alunos', id);
+            const studentDoc = await getDoc(studentDocRef);
+
+            if (studentDoc.exists()) {
+                const data = studentDoc.data();
+                const idadeCalculada = data.data_nascimento ? calculateAge(data.data_nascimento.toDate()) : '';
+
+                setFormData({
+                    aluno_id: data.aluno_id || '', nome: data.nome || '',
+                    data_nascimento: data.data_nascimento?.toDate().toISOString().split('T')[0] || '',
+                    idade: idadeCalculada,
+                    email: data.email || '', telefone_1: data.telefone_1 || '',
+                    telefone_2: data.telefone_2 || '', instagram: data.instagram || '',
+                    recebe_whatsapp: data.recebe_whatsapp || false, recebe_line: data.recebe_line || false,
+                    data_registro: data.data_registro?.toDate().toISOString().split('T')[0] || '',
+                    data_inicio: data.data_inicio?.toDate().toISOString().split('T')[0] || '',
+                    modalidade: data.modalidade || [], outros_modalidade_texto: data.outros_modalidade_texto || '',
+                    is_professor: data.is_professor || false,
+                    status: data.status || 'ativo', mensalidade: data.mensalidade || '',
+                    data_vencimento: data.data_vencimento?.toDate().getDate() || '',
+                    observacoes: data.observacoes || '', uid: data.uid || '',
+                    graduacoes: data.graduacoes || [],
+                    photoUrl: data.photoUrl || ''
+                });
+
+                if (data.aluno_id) {
+                    const alunoIdAsString = String(data.aluno_id);
+                    fetchPayments(alunoIdAsString);
+                    fetchAttendance(alunoIdAsString);
+                }
+            } else {
+                setError("Dados do aluno não encontrados.");
+            }
+        } catch (err) {
+            console.error("Erro ao buscar dados do aluno:", err);
+            setError("Ocorreu um erro ao carregar os dados.");
+        } finally {
+            setLoading(false);
+        }
+    }, [id]);
+
+    const fetchPayments = async (alunoId) => {
+        try {
+            const q = query(collection(db, 'pagamentos'), where('aluno_id', '==', alunoId), orderBy('data_pagamento', 'desc'));
+            const querySnapshot = await getDocs(q);
+            setPayments(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (err) {
+            console.error("Erro ao buscar pagamentos:", err);
+        }
+    };
+
+    const fetchAttendance = async (alunoId) => {
+        try {
+            const q = query(collection(db, 'presencas'), where('aluno_id', '==', alunoId), orderBy('data_presenca', 'desc'));
+            const querySnapshot = await getDocs(q);
+            setAttendance(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (err) {
+            console.error("Erro ao buscar presenças:", err);
+        }
     };
 
     useEffect(() => {
-        const fetchStudentAndHistory = async () => {
-            if (!id) {
-                setError("ID do estudante não fornecido.");
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const studentDocRef = doc(db, 'alunos', id);
-                const studentDoc = await getDoc(studentDocRef);
-
-                if (studentDoc.exists()) {
-                    const data = studentDoc.data();
-                    
-                    setFormData({
-                        ...data,
-                        data_nascimento: convertTimestampToString(data.data_nascimento),
-                        data_inicio: convertTimestampToString(data.data_inicio),
-                        data_registro: convertTimestampToString(data.data_registro),
-                        data_vencimento: data.data_vencimento ? data.data_vencimento.toDate().getDate() : '',
-                        is_professor: data.is_professor || false, 
-                        idade: data.idade !== undefined ? data.idade : '', 
-                        outros_modalidade_texto: data.outros_modalidade_texto || '', 
-                        uid: data.uid || '' 
-                    });
-
-                    if (data.aluno_id) {
-                        fetchPayments(data.aluno_id);
-                        fetchAttendance(data.aluno_id);
-                    } else {
-                        console.warn("aluno_id não encontrado no documento. Histórico pode estar incompleto.");
-                    }
-                } else {
-                    setError('Estudante não encontrado.');
-                }
-            } catch (err) {
-                console.error("Erro ao buscar estudante:", err);
-                setError('Erro ao carregar dados do estudante.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const fetchPayments = async (alunoId) => {
-            try {
-                const paymentsRef = collection(db, 'pagamentos');
-                const q = query(paymentsRef, where('aluno_id', '==', alunoId));
-                const querySnapshot = await getDocs(q);
-                const paymentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setPayments(paymentsData.sort((a, b) => b.data_pagamento.seconds - a.data_pagamento.seconds));
-            } catch (err) {
-                console.error("Erro ao buscar histórico de pagamentos:", err);
-            }
-        };
-
-        const fetchAttendance = async (alunoId) => {
-            try {
-                const attendanceRef = collection(db, 'presencas');
-                const q = query(attendanceRef, where('aluno_id', '==', alunoId));
-                const querySnapshot = await getDocs(q);
-                const attendanceData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setAttendance(attendanceData.sort((a, b) => b.data_presenca.seconds - a.data_presenca.seconds));
-            } catch (err) {
-                console.error("Erro ao buscar histórico de presenças:", err);
-            }
-        };
-
-        fetchStudentAndHistory();
-    }, [id]);
+        fetchStudentData();
+    }, [fetchStudentData]);
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prevData => ({
-            ...prevData,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
     const handleModalityChange = (e) => {
         const { value, checked } = e.target;
-        setFormData(prevData => {
-            const newModalidades = checked
-                ? [...prevData.modalidade, value]
-                : prevData.modalidade.filter(m => m !== value);
-            
-            if (!checked && value === 'outros') {
-                return { ...prevData, modalidade: newModalidades, outros_modalidade_texto: '' };
-            }
-            return { ...prevData, modalidade: newModalidades };
+        setFormData(prev => {
+            const newModalidades = checked ? [...prev.modalidade, value] : prev.modalidade.filter(m => m !== value);
+            return { ...prev, modalidade: newModalidades, outros_modalidade_texto: newModalidades.includes('outros') ? prev.outros_modalidade_texto : '' };
         });
+    };
+
+    const handleAddGraduacao = () => {
+        setFormData(prev => ({
+            ...prev,
+            graduacoes: [...prev.graduacoes, { modalidade: '', graduacao: '', grau: 0 }],
+        }));
+    };
+
+    const handleGraduacaoChange = (index, field, value) => {
+        const updatedGraduacoes = [...formData.graduacoes];
+        updatedGraduacoes[index][field] = value;
+        setFormData(prev => ({ ...prev, graduacoes: updatedGraduacoes }));
+    };
+
+    const handleRemoveGraduacao = (index) => {
+        const updatedGraduacoes = [...formData.graduacoes];
+        updatedGraduacoes.splice(index, 1);
+        setFormData(prev => ({ ...prev, graduacoes: updatedGraduacoes }));
     };
 
     const handleSave = async () => {
         setIsSaving(true);
-
-        const convertToTimestamp = (dateString) => {
-            if (!dateString) return null;
-            const parts = dateString.split('-');
-            if (parts.length === 3) {
-                const [year, month, day] = parts.map(Number);
-                const dateObj = new Date(year, month - 1, day);
-                return isNaN(dateObj) ? null : Timestamp.fromDate(dateObj);
-            }
-            return null;
-        };
-
-        const dataVencimentoTimestamp = formData.data_vencimento ?
-            Timestamp.fromDate(new Date(new Date().getFullYear(), new Date().getMonth(), parseInt(formData.data_vencimento))) : null;
-
-        const updatedData = {
-            ...formData,
-            data_nascimento: convertToTimestamp(formData.data_nascimento),
-            data_inicio: convertToTimestamp(formData.data_inicio),
-            data_registro: convertToTimestamp(formData.data_registro),
-            data_vencimento: dataVencimentoTimestamp,
-            grau: parseInt(formData.grau),
-            mensalidade: parseFloat(formData.mensalidade)
-        };
-
         try {
-            // Remove o UID do update se você não quiser que ele seja alterável pelo formulário
-            const { uid, ...dataToUpdate } = updatedData; 
+            const dataToUpdate = {
+                ...formData,
+                mensalidade: Number(formData.mensalidade) || 0,
+                data_nascimento: formData.data_nascimento ? Timestamp.fromDate(new Date(formData.data_nascimento)) : null,
+                data_inicio: formData.data_inicio ? Timestamp.fromDate(new Date(formData.data_inicio)) : null,
+                data_registro: formData.data_registro ? Timestamp.fromDate(new Date(formData.data_registro)) : null,
+                data_vencimento: formData.data_vencimento ? Timestamp.fromDate(new Date(new Date().getFullYear(), new Date().getMonth(), parseInt(formData.data_vencimento))) : null,
+            };
+            
+            delete dataToUpdate.uid;
+            delete dataToUpdate.aluno_id;
+            delete dataToUpdate.idade;
+            
             await updateDoc(doc(db, 'alunos', id), dataToUpdate);
             setIsEditing(false);
+            fetchStudentData();
         } catch (err) {
-            console.error("Erro ao salvar estudante:", err);
-            setError('Erro ao salvar dados do estudante.');
+            console.error("Erro ao salvar:", err);
+            setError("Não foi possível salvar as alterações.");
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDelete = () => {
-        setShowConfirmModal(true);
-    };
+    const handleDelete = () => setShowConfirmModal(true);
 
     const confirmDelete = async () => {
         try {
             await deleteDoc(doc(db, 'alunos', id));
-            navigate('/'); 
+            navigate('/lista-alunos');
         } catch (err) {
-            console.error("Erro ao excluir estudante:", err);
-            setError('Erro ao excluir dados do estudante.');
+            console.error("Erro ao deletar:", err);
+            setError("Não foi possível deletar o aluno.");
+            setShowConfirmModal(false);
         }
     };
+    
+    const handlePrintRegistration = () => {
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
+        };
 
-    const handlePayment = () => {
-        navigate(`/payments/${id}`);
-    };
-
-    const handleSearchReceipt = async () => { 
-        if (!receiptSearchId) {
-            setFoundReceipt(null);
-            return;
-        }
-        try {
-            const receiptDocRef = doc(db, 'pagamentos', receiptSearchId);
-            const receiptDoc = await getDoc(receiptDocRef);
-            if (receiptDoc.exists()) {
-                setFoundReceipt({ id: receiptDoc.id, ...receiptDoc.data() });
-            } else {
-                setFoundReceipt(null);
-                alert(`Recibo com ID ${receiptSearchId} não encontrado.`);
-            }
-        } catch (error) {
-            console.error("Erro ao buscar recibo:", error);
-            alert("Ocorreu um erro ao buscar o recibo.");
-        }
-    };
-
-    const handlePrintReceipt = (data) => {
-        const printContent = `<div style="font-family: sans-serif; padding: 20px;">
-                <h1 style="text-align: center;">Recibo de Pagamento</h1>
-                <p><strong>Recibo para:</strong> ${data.nome}</p>
-                <p><strong>Data do Pagamento:</strong> ${formatDate(data.data_pagamento)}</p>
-                <p><strong>Valor Pago:</strong> ${formatCurrency(data.valor_pago)}</p>
-                <p><strong>Referente a:</strong> ${data.observacoes || 'N/A'}</p>
-            </div>`;
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.print();
-    };
-
-    const formatDate = (timestamp) => {
-        if (!timestamp) return 'N/A';
-        const date = timestamp instanceof Timestamp ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
-        if (isNaN(date.getTime())) return 'N/A'; 
-        return date.toLocaleDateString('ja-JP');
-    };
-
-    const formatCurrency = (amount) => {
-        if (amount === null || amount === undefined) return 'N/A';
-        return `¥${parseFloat(amount).toLocaleString('ja-JP')}`;
-    };
-
-    const filterAttendance = () => {
-        const now = new Date();
-        let filteredData = attendance;
-
-        if (attendanceFilter === 'semanal') {
-            const lastWeek = new Date(now.setDate(now.getDate() - 7));
-            filteredData = attendance.filter(p => new Date(p.data_presenca.seconds * 1000) > lastWeek);
-        } else if (attendanceFilter === 'mensal') {
-            const lastMonth = new Date(now.setMonth(now.getMonth() - 1));
-            filteredData = attendance.filter(p => new Date(p.data_presenca.seconds * 1000) > lastMonth);
-        } else if (attendanceFilter === 'custom' && startDate && endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999); 
-            filteredData = attendance.filter(p => {
-                const date = new Date(p.data_presenca.seconds * 1000);
-                return date >= start && date <= end;
-            });
-        }
-        return filteredData;
-    };
-
-    const handlePrintPayments = () => {
+        const password = `bonsai${formData.aluno_id}`;
+        const modalidadeDisplay = formData.modalidade.length > 0 
+            ? formData.modalidade.map(m => modalityOptions.find(opt => opt.value === m)?.label || m).join(', ')
+            : 'Nenhuma';
+        
+        const graduacoesDisplay = formData.graduacoes.length > 0
+            ? '<ul>' + formData.graduacoes.map(g => `<li>${g.modalidade} - ${g.graduacao} (${g.grau}º grau)</li>`).join('') + '</ul>'
+            : 'Nenhuma';
+        
         const printContent = `
-            <div style="font-family: sans-serif; padding: 20px;">
-                <h1 style="text-align: center;">Histórico de Pagamentos - ${formData.nome}</h1>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background-color: #f2f2f2;">
-                            <th style="padding: 8px; border: 1px solid #ddd;">Data</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">Valor</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">Método</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${payments.map(p => `
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${formatDate(p.data_pagamento)}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${formatCurrency(p.valor)}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${p.metodo || 'N/A'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.print();
-    };
+            <html>
+            <head>
+                <title>Ficha Cadastral - ${formData.nome}</title>
+                <style>
+                    body { font-family: 'Segoe UI', sans-serif; font-size: 9.5pt; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
+                    .print-container { width: 100%; max-width: 794px; margin: auto; padding: 25px; box-sizing: border-box; }
+                    .header { display: flex; align-items: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 15px; }
+                    .logo { width: 70px; height: 70px; margin-right: 15px; }
+                    .academy-title h1 { margin: 0; color: #333; font-size: 18pt; }
+                    .academy-title p { margin: 0; color: #555; font-size: 10pt; }
+                    h2.student-name { text-align: center; margin: 18px 0; font-size: 15pt; color: #333; }
+                    h3.section-title { background-color: #f2f2f2; padding: 5px 8px; margin-top: 18px; margin-bottom: 8px; border-radius: 3px; font-size: 10.5pt; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9.5pt; }
+                    td { padding: 7px 9px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
+                    td:first-child { font-weight: bold; width: 30%; background-color: #f9f9f9; }
+                    .highlight { background-color: #fff3cd !important; font-weight: bold; font-size: 10.5pt; }
+                    p { white-space: pre-wrap; word-wrap: break-word; }
+                    ul { padding-left: 20px; margin: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="print-container">
+                    <div class="header">
+                        <img src="${bonsaiLogo}" alt="Bonsai Logo" class="logo" />
+                        <div class="academy-title">
+                            <h1>Bonsai Jiu Jitsu Academy</h1>
+                            <p>Ficha de Cadastro de Aluno / 生徒登録フォーム</p>
+                        </div>
+                    </div>
+                    <h2 class="student-name">${formData.nome}</h2>
 
-    const handlePrintAttendance = () => {
-        const filteredAttendance = filterAttendance();
-        const printContent = `
-            <div style="font-family: sans-serif; padding: 20px;">
-                <h1 style="text-align: center;">Histórico de Presenças - ${formData.nome}</h1>
-                <p style="text-align: center;">Filtro: ${attendanceFilter === 'semanal' ? 'Últimos 7 dias' : attendanceFilter === 'mensal' ? 'Últimos 30 dias' : 'Período Personalizado'}</p>
-                <p style="text-align: center;">Total de Presenças: ${filteredAttendance.length}</p>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background-color: #f2f2f2;">
-                            <th style="padding: 8px; border: 1px solid #ddd;">Data da Presença</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filteredAttendance.map(p => `
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${formatDate(p.data_presenca)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.print();
-    };
+                    <h3 class="section-title">Dados de Acesso (App) / アプリのアクセス情報</h3>
+                    <table><tbody>
+                        <tr><td>E-mail (Login) / メール (ログイン)</td><td class="highlight">${formData.email || 'N/A'}</td></tr>
+                        <tr><td>Senha (Padrão) / パスワード (初期)</td><td class="highlight">${password}</td></tr>
+                    </tbody></table>
 
-    // FUNÇÃO ATUALIZADA: Imprimir detalhes completos do estudante com novo cabeçalho e otimização A4
-    const handlePrintStudentDetails = () => {
-        const data = formData;
-        const password = `bonsai${data.aluno_id}`; // Recria a senha para impressão
-
-        // Mapeia as modalidades selecionadas para seus nomes em japonês
-        const modalitiesInJapanese = data.modalidade
-            .map(m => modalityOptions.find(opt => opt.value === m)?.japanese || m)
-            .join(', ');
-
-        const printContent = `
-            <div style="font-family: sans-serif; text-align: center; padding: 20px;"> <!-- Reduzido padding -->
-                <img src="${bonsaiLogo}" alt="Logo Bonsai Jiu Jitsu" style="width: 150px; margin-bottom: 10px;" /> <!-- Logo menor -->
-                <h1 style="font-size: 20px; margin-bottom: 20px;">BONSAI JIU JITSU ACADEMY - SHIGA</h1> <!-- Novo cabeçalho -->
-                
-                <hr style="border: 1px solid #ccc; width: 80%; margin: 20px auto;" /> <!-- Margem da linha reduzida -->
-                <div style="text-align: left; width: 80%; margin: auto; line-height: 1.4;"> <!-- line-height reduzido -->
-                    <p><strong>登録ID (Tōroku ID) / ID de Cadastro:</strong> ${data.aluno_id}</p>
-                    <p><strong>氏名 (Shimei) / Nome:</strong> ${data.nome}</p>
-                    <p style="background-color: #fce205; padding: 4px; border-radius: 3px; margin: 5px 0;"> <!-- Padding reduzido, margem adicionada -->
-                        <strong>Eメール (E-mēru) / E-mail de Login:</strong> <span style="font-weight: bold; color: #333;">${data.email}</span>
-                    </p>
-                    <p style="background-color: #fce205; padding: 4px; border-radius: 3px; margin: 5px 0;"> <!-- Padding reduzido, margem adicionada -->
-                        <strong>パスワード (Pasuwādo) / Senha Inicial:</strong> <span style="font-weight: bold; color: #333;">${password}</span>
-                    </p>
-                    <p><strong>先生 (Sensei) / Professor:</strong> ${data.is_professor ? 'はい (Hai - Sim)' : 'いいえ (Iie - Não)'}</p>
-                    <p><strong>ステータス (Sutētasu) / Status:</strong> ${data.status === 'ativo' ? 'アクティブ (Akutibu)' : data.status === 'inativo' ? '非アクティブ (Hiakutibu)' : '期限切れ (Kigengire)'}</p>
-                    <p><strong>登録日 (Tōroku-bi) / Data de Registro:</strong> ${formatDate(data.data_registro)}</p>
-                    <p><strong>入会日 (Nyūkai-bi) / Data de Início:</strong> ${formatDate(data.data_inicio)}</p>
-                    <p><strong>誕生日 (Tanjō-bi) / Data de Nascimento:</strong> ${formatDate(data.data_nascimento)}</p>
-                    <p><strong>年齢 (Nenrei) / Idade:</strong> ${data.idade !== '' ? `${data.idade}歳 (${data.idade} sai)` : '未登録 (Mitoroku)'}</p>
-                    <p><strong>電話番号 (Denwa bangō) / Telefone 1:</strong> ${data.telefone_1}</p>
-                    <p><strong>電話番号 (Denwa bangō) / Telefone 2:</strong> ${data.telefone_2 || 'N/A'}</p>
-                    <p><strong>WhatsApp受信 (WhatsApp jushin) / Receber WhatsApp:</strong> ${data.recebe_whatsapp ? 'はい (Hai - Sim)' : 'いいえ (Iie - Não)'}</p>
-                    <p><strong>LINE受信 (LINE jushin) / Receber LINE:</strong> ${data.recebe_line ? 'はい (Hai - Sim)' : 'いいえ (Iie - Não)'}</p>
-                    <p><strong>インスタグラム (Instagramu) / Instagram:</strong> ${data.instagram || 'N/A'}</p>
-                    <p><strong>受講クラス (Jukō kurasu) / Modalidade:</strong> ${modalitiesInJapanese} ${data.outros_modalidade_texto ? `(${data.outros_modalidade_texto})` : ''}</p>
-                    <p><strong>帯 (Obi) / Faixa:</strong> ${data.faixa}</p>
-                    <p><strong>度 (Do) / Grau:</strong> ${data.grau}</p>
-                    <p><strong>月謝日 (Gessha-bi) / Dia da Mensalidade:</strong> ${data.data_vencimento || 'N/A'}</p>
-                    <p><strong>月謝額 (Gessha-gaku) / Valor da Mensalidade:</strong> ${formatCurrency(data.mensalidade)}</p>
-                    <p><strong>備考 (Bikō) / Observações:</strong> ${data.observacoes || 'なし (Nashi)'}</p>
+                    <h3 class="section-title">Dados Pessoais / 個人情報</h3>
+                    <table><tbody>
+                        <tr><td>ID de Presença / 出席ID</td><td>${formData.aluno_id || 'N/A'}</td></tr>
+                        <tr><td>Data de Nascimento / 生年月日</td><td>${formatDate(formData.data_nascimento)}</td></tr>
+                        <tr><td>Idade / 年齢</td><td>${formData.idade ? `${formData.idade} anos / 歳` : 'N/A'}</td></tr>
+                    </tbody></table>
+                    
+                    <h3 class="section-title">Informações de Contato / 連絡先情報</h3>
+                    <table><tbody>
+                        <tr><td>Telefone 1 / 電話番号1</td><td>${formData.telefone_1 || 'N/A'}</td></tr>
+                        <tr><td>Instagram / インスタグラム</td><td>${formData.instagram || 'N/A'}</td></tr>
+                    </tbody></table>
+                    
+                    <h3 class="section-title">Detalhes da Academia / アカデミー詳細</h3>
+                    <table><tbody>
+                        <tr><td>Data de Registro / 登録日</td><td>${formatDate(formData.data_registro)}</td></tr>
+                        <tr><td>Data de Início / 開始日</td><td>${formatDate(formData.data_inicio)}</td></tr>
+                        <tr><td>Modalidade(s) / 種目</td><td>${modalidadeDisplay}</td></tr>
+                        <tr><td>Graduação(ões) / 帯・段位</td><td>${graduacoesDisplay}</td></tr>
+                        <tr><td>Mensalidade / 月謝</td><td>¥${Number(formData.mensalidade).toLocaleString('ja-JP') || 'N/A'}</td></tr>
+                    </tbody></table>
+                    
+                    <h3 class="section-title">Observações / 備考</h3>
+                    <p>${formData.observacoes || 'Nenhuma observação.'}</p>
                 </div>
-                <div style="text-align: center; margin-top: 20px; font-size: 0.8em; color: #666;"> <!-- Margem e font-size reduzidos -->
-                    <p>Por favor, instrua o aluno a trocar a senha no primeiro acesso por segurança.</p>
-                </div>
-            </div>
+            </body>
+            </html>
         `;
         const printWindow = window.open('', '_blank');
         printWindow.document.write(printContent);
@@ -412,424 +300,152 @@ const StudentDetails = () => {
     };
 
 
-    if (loading) return <div style={loadingStyle}>Carregando...</div>;
-    if (error) return <div style={errorStyle}>{error}</div>;
+    const handlePrintPayments = () => { /* ... */ };
+    const handlePrintAttendance = () => { /* ... */ };
+
+    if (loading) return <div className="details-loading">Carregando dados do aluno...</div>;
+    if (error) return <div className="details-error">Erro: {error}</div>;
 
     const isReadOnly = !isEditing;
 
-    const currentAttendance = filterAttendance();
-
     return (
-        <div style={containerStyle}>
-            <div style={backButtonContainerStyle}>
-                <button onClick={() => navigate(-1)} style={backButtonStyle}>
-                    &larr; Voltar
-                </button>
+        <div className="details-container">
+            <div className="details-header">
+                <button onClick={() => navigate(-1)} className="back-button">&larr; Voltar</button>
+                <h1>{isEditing ? "Editando Aluno" : "Detalhes do Aluno"}</h1>
+                <p>{formData.nome}</p>
             </div>
-            
-            <h1 style={titleStyle}>{formData.nome}</h1>
-            <h2 style={subtitleStyle}>Detalhes do Estudante</h2>
-            
-            <div style={formContainerStyle}>
-                {/* ID Presença */}
-                <label style={labelStyle}>ID Presença</label>
-                <input
-                    type="text"
-                    name="aluno_id"
-                    value={formData.aluno_id}
-                    readOnly
-                    style={{ ...inputStyle, backgroundColor: '#444', cursor: 'not-allowed' }}
-                />
 
-                {/* Nome Completo */}
-                <label style={labelStyle}>Nome Completo</label>
-                <input
-                    type="text"
-                    name="nome"
-                    value={formData.nome}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* E-mail */}
-                <label style={labelStyle}>E-mail</label>
-                <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-                
-                {/* É Professor? */}
-                <label style={labelStyle}>É Professor?</label>
-                <div style={formGroupStyle}>
-                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', color: 'white' }}>
-                        <label style={{ fontWeight: 'normal', color: 'white' }}>
-                            <input
-                                type="checkbox"
-                                name="is_professor"
-                                checked={formData.is_professor}
-                                onChange={handleInputChange}
-                                disabled={isReadOnly}
-                            /> Sim
-                        </label>
+            <form className="details-form" onSubmit={(e) => e.preventDefault()}>
+                <div className="details-section">
+                    <h3>Dados Pessoais e de Identificação</h3>
+                    <div className="form-grid">
+                        <div className="form-group full-width"><label>Nome Completo</label><input type="text" name="nome" value={formData.nome} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Data de Nascimento</label><input type="date" name="data_nascimento" value={formData.data_nascimento} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Idade</label><input type="text" value={formData.idade ? `${formData.idade} anos` : ''} readOnly /></div>
+                        <div className="form-group full-width"><label>ID de Presença (não editável)</label><input type="text" value={formData.aluno_id} readOnly /></div>
+                        <div className="form-group full-width"><label>URL da Foto de Perfil</label><input type="text" name="photoUrl" value={formData.photoUrl} onChange={handleInputChange} readOnly={isReadOnly} /></div>
                     </div>
                 </div>
-
-
-                {/* Data de Registro */}
-                <label style={labelStyle}>Data de Registro (AAAA-MM-DD)</label>
-                <input
-                    type="text"
-                    name="data_registro"
-                    value={formData.data_registro}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Data de Início */}
-                <label style={labelStyle}>Data de Início (AAAA-MM-DD)</label>
-                <input
-                    type="text"
-                    name="data_inicio"
-                    value={formData.data_inicio}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-                
-                {/* Data de Nascimento */}
-                <label style={labelStyle}>Data de Nascimento (AAAA-MM-DD)</label>
-                <input
-                    type="text"
-                    name="data_nascimento"
-                    value={formData.data_nascimento}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Idade */}
-                <label style={labelStyle}>Idade</label>
-                <input
-                    type="text"
-                    name="idade"
-                    value={formData.idade !== '' ? `${formData.idade} anos` : ''}
-                    readOnly
-                    style={{ ...inputStyle, backgroundColor: '#444', cursor: 'not-allowed' }}
-                />
-                
-                {/* Telefone 1 */}
-                <label style={labelStyle}>Telefone 1</label>
-                <input
-                    type="tel"
-                    name="telefone_1"
-                    value={formData.telefone_1}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-                
-                {/* Telefone 2 */}
-                <label style={labelStyle}>Telefone 2</label>
-                <input
-                    type="tel"
-                    name="telefone_2"
-                    value={formData.telefone_2}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Checkboxes de Contato */}
-                <div style={formGroupStyle}>
-                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', color: 'white' }}>
-                        <label style={{ fontWeight: 'normal', color: 'white' }}>
-                            <input
-                                type="checkbox"
-                                name="recebe_whatsapp"
-                                checked={formData.recebe_whatsapp}
-                                onChange={handleInputChange}
-                                disabled={isReadOnly}
-                            /> WhatsApp
-                        </label>
-                        <label style={{ fontWeight: 'normal', color: 'white' }}>
-                            <input
-                                type="checkbox"
-                                name="recebe_line"
-                                checked={formData.recebe_line}
-                                onChange={handleInputChange}
-                                disabled={isReadOnly}
-                            /> LINE
-                        </label>
-                    </div>
-                </div>
-
-                {/* Instagram */}
-                <label style={labelStyle}>Instagram</label>
-                <input
-                    type="text"
-                    name="instagram"
-                    value={formData.instagram}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Modalidade (Checkboxes) */}
-                <label style={labelStyle}>Modalidade</label>
-                <div style={checklistStyle}>
-                    {modalityOptions.map(option => (
-                        <div key={option.value} style={checkboxItemStyle}>
-                            <input
-                                type="checkbox"
-                                id={option.value}
-                                value={option.value}
-                                checked={formData.modalidade.includes(option.value)}
-                                onChange={handleModalityChange}
-                                disabled={isReadOnly}
-                            />
-                            <label htmlFor={option.value}>{option.label}</label>
+                <div className="details-section">
+                    <h3>Informações de Contato</h3>
+                    <div className="form-grid">
+                        <div className="form-group"><label>E-mail</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Instagram</label><input type="text" name="instagram" value={formData.instagram} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Telefone 1</label><input type="tel" name="telefone_1" value={formData.telefone_1} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Telefone 2</label><input type="tel" name="telefone_2" value={formData.telefone_2} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group checkbox-group full-width">
+                            <label><input type="checkbox" name="recebe_whatsapp" checked={formData.recebe_whatsapp} onChange={handleInputChange} disabled={isReadOnly} /> Receber WhatsApp?</label>
+                            <label><input type="checkbox" name="recebe_line" checked={formData.recebe_line} onChange={handleInputChange} disabled={isReadOnly} /> Receber LINE?</label>
                         </div>
-                    ))}
+                    </div>
                 </div>
-                {/* Campo para Outros */}
-                {formData.modalidade.includes('outros') && (
-                    <input
-                        type="text"
-                        name="outros_modalidade_texto"
-                        value={formData.outros_modalidade_texto}
-                        onChange={handleInputChange}
-                        placeholder="Especifique a modalidade (Outros)"
-                        style={isReadOnly ? { ...readOnlyInputStyle, marginTop: '5px' } : { ...inputStyle, marginTop: '5px' }}
-                        readOnly={isReadOnly}
-                    />
-                )}
-
-                {/* Faixa (Select) */}
-                <label style={labelStyle}>Faixa</label>
-                <select
-                    name="faixa"
-                    value={formData.faixa}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    disabled={isReadOnly}
-                >
-                    <option value="">Selecione a Faixa</option>
-                    {beltOptions.map(option => (
-                        <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
-                    ))}
-                </select>
-
-                {/* Grau */}
-                <label style={labelStyle}>Grau (0-4)</label>
-                <input
-                    type="number"
-                    name="grau"
-                    value={formData.grau}
-                    onChange={handleInputChange}
-                    min="0" max="4"
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Status */}
-                <label style={labelStyle}>Status</label>
-                <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    disabled={isReadOnly}
-                >
-                    <option value="ativo">Ativo</option>
-                    <option value="inativo">Inativo</option>
-                    <option value="atrasado">Atrasado</option>
-                </select>
-
-                {/* Dia de Vencimento */}
-                <label style={labelStyle}>Dia de Vencimento</label>
-                <select
-                    name="data_vencimento"
-                    value={formData.data_vencimento}
-                    onChange={handleInputChange}
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    disabled={isReadOnly}
-                >
-                    <option value="">Selecione o Dia</option>
-                    {dueDayOptions.map(day => (
-                        <option key={day} value={day}>{day}</option>
-                    ))}
-                </select>
-
-                {/* Valor da Mensalidade */}
-                <label style={labelStyle}>Valor da Mensalidade (Ienes)</label>
-                <input
-                    type="number"
-                    name="mensalidade"
-                    value={formData.mensalidade}
-                    onChange={handleInputChange}
-                    min="0"
-                    style={isReadOnly ? readOnlyInputStyle : inputStyle}
-                    readOnly={isReadOnly}
-                />
-
-                {/* Observações */}
-                <label style={labelStyle}>Observações</label>
-                <textarea
-                    name="observacoes"
-                    value={formData.observacoes}
-                    onChange={handleInputChange}
-                    rows="4"
-                    style={isReadOnly ? { ...readOnlyInputStyle, height: 'auto', minHeight: '100px' } : { ...inputStyle, height: 'auto', minHeight: '100px' }}
-                    readOnly={isReadOnly}
-                />
-            </div>
+                <div className="details-section">
+                    <h3>Detalhes da Academia</h3>
+                    <div className="form-grid">
+                        <div className="form-group"><label>Data de Registro</label><input type="date" name="data_registro" value={formData.data_registro} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group"><label>Data de Início</label><input type="date" name="data_inicio" value={formData.data_inicio} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                        <div className="form-group checkbox-group full-width">
+                            <label className="group-label">Modalidades</label>
+                            <div className="checkbox-options">{modalityOptions.map(option => (<label key={option.value}><input type="checkbox" value={option.value} checked={formData.modalidade.includes(option.value)} onChange={handleModalityChange} disabled={isReadOnly} /> {option.label}</label>))}</div>
+                            {formData.modalidade.includes('outros') && (<input type="text" name="outros_modalidade_texto" value={formData.outros_modalidade_texto} onChange={handleInputChange} placeholder="Especifique a outra modalidade" readOnly={isReadOnly} className="other-modality-input" />)}
+                        </div>
+                        <div className="form-group full-width">
+                            <label className="group-label">Graduações</label>
+                            {isReadOnly && formData.graduacoes.length === 0 && (<p className="no-data">Nenhuma graduação registrada.</p>)}
+                            {formData.graduacoes && formData.graduacoes.map((grad, index) => (
+                                <div key={index} className="graduacao-item">
+                                    <select value={grad.modalidade} onChange={(e) => handleGraduacaoChange(index, 'modalidade', e.target.value)} disabled={isReadOnly} ><option value="">Modalidade</option><option value="jiu-jitsu">Jiu Jitsu</option><option value="capoeira">Capoeira</option><option value="taekwondo">Taekwondo</option></select>
+                                    <select value={grad.graduacao} onChange={(e) => handleGraduacaoChange(index, 'graduacao', e.target.value)} disabled={isReadOnly} ><option value="">Graduação</option>{grad.modalidade === 'jiu-jitsu' && jiuJitsuBelts.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}{grad.modalidade === 'capoeira' && capoeiraBelts.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}</select>
+                                    <input type="number" placeholder="Grau" value={grad.grau} min="0" max="6" onChange={(e) => handleGraduacaoChange(index, 'grau', parseInt(e.target.value))} readOnly={isReadOnly} />
+                                    {!isReadOnly && ( <button type="button" onClick={() => handleRemoveGraduacao(index)} className="btn btn-remove-grad"><FaTrashAlt /></button> )}
+                                </div>
+                            ))}
+                            {!isReadOnly && ( <button type="button" onClick={handleAddGraduacao} className="btn btn-add-grad"><FaPlus /> Adicionar Graduação</button> )}
+                        </div>
+                    </div>
+                </div>
+                <div className="details-section">
+                    <h3>Financeiro e Status</h3>
+                    <div className="form-grid">
+                        <div className="form-group"><label>Status do Aluno</label><select name="status" value={formData.status} onChange={handleInputChange} disabled={isReadOnly}><option value="ativo">Ativo</option><option value="inativo">Inativo</option><option value="atrasado">Atrasado</option></select></div>
+                        <div className="form-group"><label>Dia do Vencimento</label><select name="data_vencimento" value={formData.data_vencimento} onChange={handleInputChange} disabled={isReadOnly}><option value="">Selecione o Dia</option>{dueDayOptions.map(day => <option key={day} value={day}>{day}</option>)}</select></div>
+                        <div className="form-group full-width"><label>Valor da Mensalidade (¥)</label><input type="number" name="mensalidade" value={formData.mensalidade} onChange={handleInputChange} readOnly={isReadOnly} /></div>
+                    </div>
+                </div>
+                <div className="details-section">
+                    <h3>Outras Informações</h3>
+                    <div className="form-grid">
+                        <div className="form-group full-width"><label>Observações</label><textarea name="observacoes" value={formData.observacoes} onChange={handleInputChange} readOnly={isReadOnly} rows="4" /></div>
+                        <div className="form-group checkbox-group full-width"><label><input type="checkbox" name="is_professor" checked={formData.is_professor} onChange={handleInputChange} disabled={isReadOnly} /> É Professor?</label></div>
+                    </div>
+                </div>
+            </form>
             
-            <div style={buttonContainerStyle}>
+            <div className="details-actions">
                 {isReadOnly ? (
                     <>
-                        <button onClick={() => setIsEditing(true)} style={editButtonStyle}>
-                            <FaEdit /> Editar
-                        </button>
-                        <button onClick={handleDelete} style={deleteButtonStyle}>
-                            <FaTrashAlt /> Excluir
-                        </button>
-                        <button onClick={handlePrintStudentDetails} style={printButtonStyle}> 
-                            <FaPrint /> Imprimir Ficha
-                        </button>
+                        <button onClick={() => setIsEditing(true)} className="btn btn-edit"><FaEdit /> Editar</button>
+                        <button onClick={handleDelete} className="btn btn-delete"><FaTrashAlt /> Excluir</button>
+                        <button onClick={() => navigate(`/payments/${id}`)} className="btn btn-payment"><FaCreditCard /> Lançar Pagamento</button>
+                        <button onClick={handlePrintRegistration} className="btn btn-print"><FaPrint /> Imprimir Ficha</button>
                     </>
                 ) : (
                     <>
-                        <button onClick={handleSave} style={saveButtonStyle} disabled={isSaving}>
-                            <FaSave /> {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-                        </button>
-                        <button onClick={() => { setIsEditing(false); }} style={cancelButtonStyle}>
-                            <FaTimes /> Cancelar
-                        </button>
+                        <button onClick={handleSave} className="btn btn-save" disabled={isSaving}><FaSave /> {isSaving ? 'Salvando...' : 'Salvar'}</button>
+                        <button onClick={() => { setIsEditing(false); fetchStudentData(); }} className="btn btn-cancel"><FaTimes /> Cancelar</button>
                     </>
                 )}
             </div>
 
-            {isReadOnly && (
-                <button 
-                    onClick={handlePayment} 
-                    style={payButtonStyle}
-                >
-                    <FaCreditCard /> Fazer Pagamento
-                </button>
-            )}
-
-            <div style={historyContainerStyle}>
-                <h3 style={sectionTitleStyle}>Histórico de Presença</h3>
-                <div style={filterContainerStyle}>
-                    <button
-                        onClick={() => setAttendanceFilter('semanal')}
-                        style={{ ...filterButtonStyle, backgroundColor: attendanceFilter === 'semanal' ? '#FFD700' : '#444' }}
-                    >
-                        Semanal
-                    </button>
-                    <button
-                        onClick={() => setAttendanceFilter('mensal')}
-                        style={{ ...filterButtonStyle, backgroundColor: attendanceFilter === 'mensal' ? '#FFD700' : '#444' }}
-                    >
-                        Mensal
-                    </button>
-                    <button
-                        onClick={() => setAttendanceFilter('custom')}
-                        style={{ ...filterButtonStyle, backgroundColor: attendanceFilter === 'custom' ? '#FFD700' : '#444' }}
-                    >
-                        Período
-                    </button>
-                </div>
-                {attendanceFilter === 'custom' && (
-                    <div style={dateRangeContainerStyle}>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            style={dateInputStyle}
-                        />
-                        <span style={{ color: 'white' }}>até</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            style={dateInputStyle}
-                        />
-                    </div>
-                )}
-                <div style={{ textAlign: 'center', marginTop: '10px', marginBottom: '10px' }}>
-                    <button onClick={handlePrintAttendance} style={printButtonStyle}><FaPrint /> Imprimir Presenças</button>
-                </div>
-
-                <p style={totalCountStyle}>Total de Presenças: {currentAttendance.length}</p>
-
-                {currentAttendance.length > 0 ? (
-                    <table style={tableStyle}>
-                        <thead>
-                            <tr>
-                                <th>Data da Presença</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {currentAttendance.map(p => (
-                                <tr key={p.id}>
-                                    <td>{formatDate(p.data_presenca)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <p style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic' }}>Nenhuma presença encontrada para este período.</p>
-                )}
-            </div>
-
-            <div style={historyContainerStyle}>
-                <h3 style={sectionTitleStyle}>Histórico de Pagamento</h3>
-                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                    <button onClick={handlePrintPayments} style={printButtonStyle}><FaPrint /> Imprimir Pagamentos</button>
+            <div className="details-section history-section">
+                <div className="history-header">
+                    <h3>Histórico de Pagamentos</h3>
+                    <button onClick={handlePrintPayments} className="btn btn-print"><FaPrint /> Imprimir Pagamentos</button>
                 </div>
                 {payments.length > 0 ? (
-                    <table style={tableStyle}>
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Valor</th>
-                                <th>Método</th>
-                            </tr>
-                        </thead>
+                    <table className="history-table">
+                        <thead><tr><th>Data</th><th>Valor</th><th>Método</th></tr></thead>
                         <tbody>
                             {payments.map(p => (
                                 <tr key={p.id}>
-                                    <td>{formatDate(p.data_pagamento)}</td>
-                                    <td>{formatCurrency(p.valor)}</td>
+                                    <td>{p.data_pagamento?.toDate().toLocaleDateString('pt-BR') || 'N/A'}</td>
+                                    <td>¥{p.valor_pago?.toLocaleString('ja-JP') || 'N/A'}</td>
                                     <td>{p.metodo || 'N/A'}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                ) : (
-                    <p style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic' }}>Nenhum pagamento encontrado.</p>
-                )}
+                ) : ( <p>Nenhum histórico de pagamento encontrado.</p> )}
+            </div>
+
+            <div className="details-section history-section">
+                <div className="history-header">
+                    <h3>Histórico de Presenças</h3>
+                    <button onClick={handlePrintAttendance} className="btn btn-print"><FaPrint /> Imprimir Presenças</button>
+                </div>
+                {attendance.length > 0 ? (
+                    <table className="history-table">
+                        <thead><tr><th>Data</th></tr></thead>
+                        <tbody>
+                            {attendance.map(a => (
+                                <tr key={a.id}>
+                                    <td>{a.data_presenca?.toDate().toLocaleDateString('pt-BR') || 'N/A'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : ( <p>Nenhum histórico de presença encontrado.</p> )}
             </div>
 
             {showConfirmModal && (
-                <div style={confirmModalStyle}>
-                    <div style={confirmContentStyle}>
+                <div className="details-modal-overlay">
+                    <div className="details-modal-content">
                         <h3>Confirmar Exclusão</h3>
-                        <p>Tem certeza de que deseja excluir este estudante?</p>
-                        <div style={confirmButtonsStyle}>
-                            <button onClick={confirmDelete} style={confirmYesButtonStyle}>
-                                Sim, Excluir
-                            </button>
-                            <button onClick={() => setShowConfirmModal(false)} style={confirmCancelButtonStyle}>
-                                Cancelar
-                            </button>
+                        <p>Tem certeza que deseja excluir permanentemente o aluno **{formData.nome}**?</p>
+                        <div className="modal-actions">
+                            <button onClick={confirmDelete} className="btn btn-delete">Sim, Excluir</button>
+                            <button onClick={() => setShowConfirmModal(false)} className="btn btn-cancel">Cancelar</button>
                         </div>
                     </div>
                 </div>
@@ -839,134 +455,3 @@ const StudentDetails = () => {
 };
 
 export default StudentDetails;
-
-// Estilos (inalterados, exceto a inclusão do bonsaiLogo)
-const containerStyle = {
-    padding: '20px', maxWidth: '800px', margin: 'auto', textAlign: 'center', fontFamily: 'sans-serif',
-    border: '2px solid #FFD700', borderRadius: '15px', boxShadow: '0 0 20px #FFD700',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'white'
-};
-const loadingStyle = { color: '#FFD700', textAlign: 'center', fontSize: '1.5em', marginTop: '50px' };
-const errorStyle = { color: '#dc3545', textAlign: 'center', fontSize: '1.5em', marginTop: '50px' };
-const titleStyle = { color: '#FFD700', textShadow: '0 0 10px #FFD700' };
-const subtitleStyle = { color: 'white' };
-const formContainerStyle = {
-    marginTop: '20px', textAlign: 'left', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'
-};
-const formGroupStyle = { gridColumn: '1 / -1' };
-const labelStyle = { color: '#FFD700', marginBottom: '5px' };
-const inputStyle = {
-    padding: '10px', borderRadius: '8px', border: '1px solid #FFD700',
-    backgroundColor: '#333', color: '#FFD700', boxShadow: '0 0 5px #FFD700', boxSizing: 'border-box',
-    width: '100%'
-};
-const readOnlyInputStyle = {
-    ...inputStyle, backgroundColor: '#555', cursor: 'not-allowed', color: '#aaa'
-};
-const checklistStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginTop: '10px',
-    gridColumn: '1 / -1'
-};
-const checkboxItemStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px'
-};
-const buttonContainerStyle = {
-    marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap'
-};
-const backButtonContainerStyle = {
-    width: '100%', textAlign: 'left', marginBottom: '20px'
-};
-const backButtonStyle = {
-    backgroundColor: '#333', color: '#FFD700', border: '1px solid #FFD700', padding: '10px 15px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
-};
-const saveButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
-};
-const cancelButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
-};
-const editButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
-};
-const deleteButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
-};
-const payButtonStyle = {
-    width: '100%',
-    padding: '20px',
-    fontSize: '1.2em',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    marginTop: '15px',
-    boxShadow: '0 4px 15px rgba(40, 167, 69, 0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px'
-};
-const historyContainerStyle = {
-    marginTop: '30px', textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '10px', boxShadow: '0 0 10px #FFD700'
-};
-const sectionTitleStyle = { color: '#FFD700', marginBottom: '15px', textShadow: '0 0 5px #FFD700' };
-const tableStyle = {
-    width: '100%', borderCollapse: 'collapse', marginTop: '15px', color: 'white'
-};
-const tableHeaderStyle = {
-    backgroundColor: '#FFD700', color: '#333', padding: '12px', textAlign: 'left', borderBottom: '2px solid #333'
-};
-const tableCellStyle = {
-    padding: '10px', borderBottom: '1px solid #555'
-};
-const tableRowHoverStyle = {
-    backgroundColor: 'rgba(255, 215, 0, 0.1)'
-};
-const filterContainerStyle = {
-    display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '15px'
-};
-const filterButtonStyle = {
-    padding: '8px 15px',
-    border: '1px solid #FFD700',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    color: 'white'
-};
-const dateRangeContainerStyle = {
-    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '15px'
-};
-const dateInputStyle = {
-    padding: '8px', borderRadius: '5px', border: '1px solid #FFD700', backgroundColor: '#333', color: '#FFD700'
-};
-const printButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', margin: '10px auto'
-};
-const confirmModalStyle = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-};
-const confirmContentStyle = {
-    backgroundColor: '#333', padding: '30px', borderRadius: '10px', textAlign: 'center', border: '2px solid #FFD700', maxWidth: '400px', boxShadow: '0 0 15px #FFD700'
-};
-const confirmButtonsStyle = {
-    marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '10px'
-};
-const confirmYesButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer'
-};
-const confirmCancelButtonStyle = {
-    padding: '10px 20px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer'
-};
-const totalCountStyle = {
-    fontSize: '1.2em',
-    color: '#FFD700',
-    marginTop: '10px',
-    marginBottom: '10px',
-    fontWeight: 'bold',
-    textShadow: '0 0 5px rgba(255, 215, 0, 0.5)'
-};

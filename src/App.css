@@ -1,10 +1,35 @@
+/* src/App.css */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ======================================================= */
+/* ## LAYOUT GERAL E FUNDO DA PÁGINA ## */
+/* ======================================================= */
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden; /* Previne rolagem horizontal indesejada */
+  overflow-y: auto;   /* Garante a rolagem vertical */
+  margin: 0;
+  padding: 0;
+  background-color: #f0f2f5; /* Fundo cinza claro para toda a aplicação */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  /* text-align: center; foi removido para não afetar os componentes filhos */
 }
 
+.app-container {
+  min-height: 100%;
+  width: 100%;
+}
+
+/* Estilos padrão do Vite (mantidos) */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -39,4 +64,23 @@
 
 .read-the-docs {
   color: #888;
+}/* src/App.css */
+
+.app-container {
+  /* Garante que o container ocupe a largura toda */
+  width: 100%; 
+  
+  /* Usa Flexbox para controlar o alinhamento */
+  display: flex;
+  flex-direction: column;
+
+  /* ESSA É A PROPRIEDADE CHAVE:
+     Centraliza todos os filhos diretos (como o seu dashboard) no eixo horizontal. */
+  align-items: center; 
+  
+  /* Garante que o app tenha no mínimo a altura da tela */
+  min-height: 100vh; 
+  
+  /* Define uma cor de fundo base para a área fora do conteúdo */
+  background-color: #f0f2f5; 
 }

@@ -1,432 +1,293 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getDoc, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestore'; 
-import { db, auth } from '../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
-import { useNavigate, useParams } from 'react-router-dom';
-import Receipt from './Receipt';
-import ReactDOMServer from 'react-dom/server';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db } from "../firebaseConfig";
+import { doc, getDoc, collection, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { FaPrint } from 'react-icons/fa';
+import bonsaiLogo from '../assets/logorecibo.png';
 
-const messages = {
-    pt: {
-        title: "Registro de Pagamento",
-        id_placeholder: "ID do aluno (4 dígitos)",
-        amount_label: "Valor Pago (¥):",
-        payment_date_label: "Data do Pagamento:",
-        observations_label: "Valor pago referente à:", // Renomeado
-        register_button: "Registrar Pagamento",
-        search_button: "Buscar",
-        search_error: "ID não encontrado. Tente novamente.",
-        invalid_id: "O ID deve ter 4 dígitos.",
-        loading: "Carregando...",
-        unknown_error: "Ocorreu um erro. Tente novamente.",
-        payment_success: (name) => `Pagamento de ${name} registrado com sucesso!`, // Mensagem adaptada
-        receipt_print_button: "Imprimir Recibo",
-        new_payment_button: "Fazer Novo Pagamento",
-        overdue_message: (days) => `🚨 Atraso no Pagamento: ${days} dias 🚨`,
-        on_time_message: "Pagamento em dia!",
-        not_authenticated: "Você precisa estar logado para acessar esta página."
-    }
-};
-
-function PaymentScreen() {
-    const navigate = useNavigate();
+const PaymentScreen = () => {
     const { id } = useParams();
-
-    const [alunoId, setAlunoId] = useState('');
-    const [alunoData, setAlunoData] = useState(null);
-    const [diasAtraso, setDiasAtraso] = useState(null);
-    const [valorPago, setValorPago] = useState('');
-    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-    const [observacoes, setObservacoes] = useState('');
-    const [feedback, setFeedback] = useState('');
+    const navigate = useNavigate();
+    const [studentData, setStudentData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isPaymentRegistered, setIsPaymentRegistered] = useState(false);
-    const [receiptData, setReceiptData] = useState(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [error, setError] = useState('');
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [paymentNotes, setPaymentNotes] = useState('');
+    const [paymentType, setPaymentType] = useState('normal'); // Estado para tipo de pagamento
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [paymentSuccessData, setPaymentSuccessData] = useState(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, user => {
-            if (user) {
-                setIsAuthenticated(true);
-                if (id) {
-                    fetchStudentData(id, true);
+        const fetchStudentData = async () => {
+            try {
+                if (!id) throw new Error("ID do aluno não fornecido.");
+                const docRef = doc(db, 'alunos', id);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    setStudentData(data);
+                    setPaymentAmount(data.mensalidade || '');
+                    
+                    const currentMonthName = new Date().toLocaleString('pt-BR', { month: 'long' });
+                    setPaymentNotes(`Mensalidade de ${currentMonthName}`);
                 } else {
-                    setLoading(false);
+                    throw new Error("Dados do aluno não encontrados.");
                 }
-            } else {
-                setIsAuthenticated(false);
+            } catch (err) {
+                console.error("Erro ao buscar dados do aluno:", err);
+                setError(err.message);
+            } finally {
                 setLoading(false);
-                navigate('/login');
             }
-        });
-        return () => unsubscribe();
-    }, [id, navigate]);
+        };
+        fetchStudentData();
+    }, [id]);
 
-    const fetchStudentData = async (idToFetch, isDocId = false) => {
-        setFeedback('');
-        setAlunoData(null);
-        setDiasAtraso(null);
-        setLoading(true);
+    const handleProcessPayment = async (e) => {
+        e.preventDefault();
+        setIsProcessing(true);
 
-        try {
-            let alunoDocSnap;
-            let alunoDocRef;
-            if (isDocId) {
-                alunoDocRef = doc(db, 'alunos', idToFetch);
-                alunoDocSnap = await getDoc(alunoDocRef);
-            } else {
-                const idNumber = parseInt(idToFetch);
-                const alunosRef = collection(db, 'alunos');
-                const q = query(alunosRef, where('aluno_id', '==', idNumber));
-                const querySnapshot = await getDocs(q);
-                alunoDocSnap = querySnapshot.empty ? null : querySnapshot.docs[0];
-                if (alunoDocSnap) {
-                    alunoDocRef = alunoDocSnap.ref;
-                }
-            }
-
-            if (alunoDocSnap && alunoDocSnap.exists()) {
-                const fetchedData = alunoDocSnap.data();
-                setAlunoData({ ...fetchedData, docId: alunoDocRef.id });
-                
-                if (fetchedData.data_vencimento) {
-                    const today = new Date();
-                    const dueDate = fetchedData.data_vencimento.toDate();
-                    
-                    today.setHours(0, 0, 0, 0);
-                    dueDate.setHours(0, 0, 0, 0);
-
-                    const diffTime = today.getTime() - dueDate.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                    
-                    setDiasAtraso(diffDays > 0 ? diffDays : 0);
-                } else {
-                    setDiasAtraso(0);
-                }
-            } else {
-                setFeedback(messages.pt.search_error);
-            }
-        } catch (error) {
-            console.error("Erro ao buscar aluno:", error);
-            setFeedback(messages.pt.unknown_error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSearch = () => {
-        if (alunoId.length !== 4) {
-            setFeedback(messages.pt.invalid_id);
-            return;
-        }
-        fetchStudentData(alunoId);
-    };
-
-    const handlePaymentRegistration = async () => {
-        setLoading(true);
-        setFeedback('');
-
-        if (!alunoData || !valorPago) {
-            setFeedback("Por favor, preencha o valor do pagamento.");
-            setLoading(false);
+        if (!paymentAmount || !paymentMethod) {
+            alert('Por favor, preencha o valor e o método de pagamento.');
+            setIsProcessing(false);
             return;
         }
 
         try {
-            const paymentTimestamp = Timestamp.fromDate(new Date(paymentDate));
-            
-            const pagamentoData = {
-                aluno_id: alunoData.aluno_id,
-                nome: alunoData.nome,
-                valor_pago: parseFloat(valorPago),
-                modalidade: alunoData.modalidade || 'Não especificada',
-                observacoes: observacoes,
-                data_pagamento: paymentTimestamp,
+            const paymentDate = Timestamp.now();
+            const paymentData = {
+                aluno_id: String(studentData.aluno_id),
+                aluno_doc_id: studentData.id,
+                nome: studentData.nome,
+                valor_pago: parseFloat(paymentAmount),
+                metodo: paymentMethod,
+                observacoes: paymentNotes,
+                data_pagamento: paymentDate,
+                modalidade: studentData.modalidade?.join(', ') || 'N/A',
             };
 
-            await addDoc(collection(db, 'pagamentos'), pagamentoData);
+            const newPaymentRef = await addDoc(collection(db, 'pagamentos'), paymentData);
+
+            const studentDocRef = doc(db, 'alunos', id);
             
-            const studentRef = doc(db, 'alunos', alunoData.docId);
+            // Lógica para atualizar status e data de vencimento
             const today = new Date();
-            let newDueDate = new Date();
-
-            if (alunoData.data_vencimento && alunoData.data_vencimento.toDate() > today) {
-                newDueDate = alunoData.data_vencimento.toDate();
+            const dueDay = studentData.data_vencimento?.toDate().getDate() || 28;
+            let nextDueDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+            if (today.getDate() >= dueDay) {
+                nextDueDate.setMonth(nextDueDate.getMonth() + 1);
             }
-
-            newDueDate.setMonth(newDueDate.getMonth() + 1);
-
-            await updateDoc(studentRef, {
-                data_vencimento: Timestamp.fromDate(newDueDate),
-                status: 'Ativo'
-            });
-
-            setReceiptData({
-                ...pagamentoData,
-                data_pagamento: new Date(paymentDate),
-            });
             
-            setIsPaymentRegistered(true);
-            setFeedback(messages.pt.payment_success(alunoData.nome));
+            const studentUpdateData = {
+                status: 'ativo',
+                data_vencimento: Timestamp.fromDate(nextDueDate),
+            };
 
-        } catch (error) {
-            console.error("Erro ao registrar pagamento:", error);
-            setFeedback(`Erro ao registrar pagamento: ${error.message}`);
+            // Se o pagamento for VIP, adiciona os campos de VIP
+            if (paymentType === 'vip') {
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + 30); // Adiciona 30 dias
+                studentUpdateData.is_vip = true;
+                studentUpdateData.vip_expires_at = Timestamp.fromDate(expiryDate);
+            }
+            
+            await updateDoc(studentDocRef, studentUpdateData);
+            
+            setPaymentSuccessData({ ...paymentData, id: newPaymentRef.id });
+
+        } catch (err) {
+            console.error("Erro ao processar o pagamento:", err);
+            setError("Ocorreu um erro ao processar o pagamento.");
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     };
-
-    const handlePrintReceipt = () => {
-        if (!receiptData) return;
-        const receiptHtml = ReactDOMServer.renderToString(<Receipt data={receiptData} />);
-        
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Recibo de Pagamento</title>');
-        printWindow.document.write('<style>@media print { body { -webkit-print-color-adjust: exact; } }</style>');
-        printWindow.document.write('</head><body style="padding: 20px;">');
-        printWindow.document.write(receiptHtml);
-        printWindow.document.write('</body></html>');
+    
+    const handlePrintReceipt = (data) => {
+        if (!data) return;
+        const ACADEMY_INFO = {
+            name: "盆栽アカデミー",
+            address: "〒520-3234 滋賀県湖南市中央1丁目44-1 2階",
+            website: "https://bonsaijjshiga.com/"
+        };
+        const formatDateTime = (timestamp) => {
+            if (!timestamp || !timestamp.toDate) return 'N/A';
+            const dateObj = timestamp.toDate();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            return dateObj.toLocaleDateString('ja-JP', options);
+        };
+        const printContent = `
+            <html><head><title>Recibo - ${data.nome}</title>
+            <style>
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; -webkit-print-color-adjust: exact; }
+                .receipt-container { border: 2px solid #ccc; border-radius: 10px; padding: 20px; max-width: 400px; margin: 20px auto; background-color: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.1); color: #333; }
+                .header { text-align: center; margin-bottom: 10px; }
+                .logo { width: 100px; margin-bottom: 10px; }
+                .header h2 { margin: 0; color: #333; }
+                .header p { margin: 5px 0 0 0; color: #555; font-size: 0.9em; }
+                .divider { border: 0; border-top: 1px dashed #ccc; margin: 15px 0; }
+                .section { margin-bottom: 20px; }
+                .section-title { border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; color: #333; }
+                .info-line { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                .label { font-weight: bold; }
+                .value { text-align: right; }
+                .observations-text { font-style: italic; color: #666; text-align: left; font-size: 0.9em; border: 1px solid #eee; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
+                .footer { text-align: center; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; color: #555; font-size: 0.9em; }
+                @media print { .receipt-container { margin: 0; border: none; box-shadow: none; max-width: 100%; } }
+            </style></head><body><div class="receipt-container">
+                <div class="header">
+                    <img src="${bonsaiLogo}" alt="盆栽アカデミーロゴ" class="logo" />
+                    <h2>${ACADEMY_INFO.name}</h2><p>${ACADEMY_INFO.address}</p>
+                </div><hr class="divider" />
+                <div class="section">
+                    <h4 class="section-title">お支払い領収書 (Recibo de Pagamento)</h4>
+                    <div class="info-line"><span class="label">生徒名 (Nome):</span><span class="value">${data.nome}</span></div>
+                    <div class="info-line"><span class="label">ID:</span><span class="value">${data.aluno_id}</span></div>
+                    <div class="info-line"><span class="label">コース (Curso):</span><span class="value">${data.modalidade || '指定なし'}</span></div>
+                </div><div class="section">
+                    <h4 class="section-title">お支払い詳細 (Detalhes do Pagamento)</h4>
+                    <div class="info-line"><span class="label">お支払い日時 (Data):</span><span class="value">${formatDateTime(data.data_pagamento)}</span></div>
+                    <div class="info-line"><span class="label">お支払い金額 (Valor):</span><span class="value">¥ ${data.valor_pago.toLocaleString('ja-JP')}</span></div>
+                </div>
+                ${data.observacoes ? `<div class="section"><h4 class="section-title">備考 (Observações)</h4><p class="observations-text">${data.observacoes}</p></div>` : ''}
+                <div class="footer"><p style="margin: 0">${ACADEMY_INFO.website}</p><p style="margin: 0; color: #555">ありがとうございました！</p></div>
+            </div></body></html>
+        `;
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(printContent);
         printWindow.document.close();
-        
         printWindow.focus();
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
-        }, 500); 
+        }, 250);
     };
 
     const handleNewPayment = () => {
-        setIsPaymentRegistered(false);
-        setAlunoData(null);
-        setAlunoId('');
-        setValorPago('');
-        setPaymentDate(new Date().toISOString().split('T')[0]);
-        setObservacoes('');
-        setReceiptData(null);
-        setFeedback('');
+        setPaymentAmount(studentData.mensalidade || '');
+        const currentMonthName = new Date().toLocaleString('pt-BR', { month: 'long' });
+        setPaymentNotes(`Mensalidade de ${currentMonthName}`);
+        setPaymentMethod('');
+        setPaymentSuccessData(null);
     };
 
-    if (!isAuthenticated) {
-        return <div style={{...containerStyle, textAlign: 'center', color: '#FFD700'}}>{messages.pt.not_authenticated}</div>; 
-    }
-
-    if (loading) {
-        return <div style={{...containerStyle, textAlign: 'center', paddingTop: '50px', color: '#FFD700'}}>{messages.pt.loading}</div>;
-    }
+    if (loading) return <div style={styles.loading}>Carregando...</div>;
+    if (error) return <div style={styles.error}>Erro: {error}</div>;
+    if (!studentData) return <div style={styles.error}>Aluno não encontrado.</div>;
+    
+    const nextDueDateText = studentData.data_vencimento ? studentData.data_vencimento.toDate().toLocaleDateString('pt-BR') : 'N/A';
 
     return (
-        <div style={containerStyle}>
-            <button onClick={() => navigate('/dashboard')} style={backButtonStyle}>← Voltar</button>
-            <h2 style={titleStyle}>{messages.pt.title}</h2>
+        <div style={styles.container}>
+            <div style={styles.header}>
+                <h1 style={styles.title}>Lançar Pagamento</h1>
+                <p style={styles.studentName}>Aluno: {studentData.nome}</p>
+            </div>
 
-            {isPaymentRegistered ? (
-                <div style={successMessageStyle}>
-                    <p style={{color: '#28a745', fontWeight: 'bold'}}>{feedback}</p>
-                    <button onClick={handlePrintReceipt} style={printReceiptButtonStyle}>
-                        {messages.pt.receipt_print_button}
-                    </button>
-                    <button onClick={handleNewPayment} style={newPaymentButtonStyle}>
-                        {messages.pt.new_payment_button}
-                    </button>
+            {paymentSuccessData ? (
+                <div style={styles.successContainer}>
+                    <h2 style={styles.successTitle}>Pagamento Processado com Sucesso!</h2>
+                    <p><strong>Valor:</strong> ¥{paymentSuccessData.valor_pago.toLocaleString('ja-JP')}</p>
+                    <p><strong>Data:</strong> {paymentSuccessData.data_pagamento.toDate().toLocaleDateString('pt-BR')}</p>
+                    
+                    <div style={styles.successActions}>
+                        <button onClick={() => handlePrintReceipt(paymentSuccessData)} style={styles.printButton}>
+                            <FaPrint /> Imprimir Recibo
+                        </button>
+                        <button onClick={handleNewPayment} style={styles.newPaymentButton}>
+                            Lançar Outro Pagamento
+                        </button>
+                        <button onClick={() => navigate(`/student-details/${id}`)} style={styles.backButton}>
+                            Voltar para Detalhes
+                        </button>
+                    </div>
                 </div>
             ) : (
-                <>
-                    {!alunoData && (
-                        <div style={formGroupStyle}>
-                            <input
-                                type="number"
-                                placeholder={messages.pt.id_placeholder}
-                                value={alunoId}
-                                onChange={(e) => setAlunoId(e.target.value)}
-                                style={{...inputStyle, width: '60%'}}
-                            />
-                            <button onClick={handleSearch} style={searchButtonStyle}>
-                                {messages.pt.search_button}
-                            </button>
-                        </div>
-                    )}
+                <form onSubmit={handleProcessPayment} style={styles.form}>
+                    <div style={styles.infoBox}>
+                        <p>Próximo Vencimento: <strong style={styles.strong}>{nextDueDateText}</strong></p>
+                        <p>Valor da Mensalidade: <strong style={styles.strong}>¥{studentData.mensalidade?.toLocaleString('ja-JP') || 'N/A'}</strong></p>
+                    </div>
                     
-                    {feedback && <p style={feedbackStyle}>{feedback}</p>}
-
-                    {alunoData && (
-                        <div style={studentInfoStyle}>
-                            <p style={studentNameStyle}>{alunoData.nome}</p>
-
-                            {diasAtraso !== null && (
-                                <div style={diasAtraso > 0 ? warningStyle : onTimeStyle}>
-                                    <p>
-                                        {diasAtraso > 0 
-                                            ? messages.pt.overdue_message(diasAtraso)
-                                            : messages.pt.on_time_message}
-                                    </p>
-                                </div>
-                            )}
-
-                            <div style={formGroupStyle}>
-                                <label style={labelStyle}>{messages.pt.payment_date_label}</label>
-                                <input
-                                    type="date"
-                                    value={paymentDate}
-                                    onChange={(e) => setPaymentDate(e.target.value)}
-                                    style={inputStyle}
-                                />
-                            </div>
-                            
-                            <div style={formGroupStyle}>
-                                <label style={labelStyle}>{messages.pt.amount_label}</label>
-                                <input
-                                    type="number"
-                                    step="1"
-                                    value={valorPago}
-                                    onChange={(e) => setValorPago(e.target.value)}
-                                    placeholder="Ex: 5000"
-                                    required
-                                    style={inputStyle}
-                                />
-                            </div>
-                            
-                            <div style={formGroupStyle}>
-                                <label style={labelStyle}>{messages.pt.observations_label}</label>
-                                <textarea
-                                    value={observacoes}
-                                    onChange={(e) => setObservacoes(e.target.value)}
-                                    placeholder="Adicione uma observação (ex: Mensalidade de Setembro)"
-                                    style={textareaStyle}
-                                    rows="3"
-                                ></textarea>
-                            </div>
-
-                            <button
-                                onClick={handlePaymentRegistration}
-                                style={registerButtonStyle}
-                                disabled={loading || !valorPago}
-                            >
-                                {loading ? messages.pt.loading : messages.pt.register_button}
-                            </button>
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Valor Pago (¥)</label>
+                        <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required min="0" style={styles.input}/>
+                    </div>
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Método de Pagamento</label>
+                        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} required style={styles.select}>
+                            <option value="">Selecione...</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="cartao">Cartão de Crédito/Débito</option>
+                            <option value="pix">Transferência (Pix, etc.)</option>
+                        </select>
+                    </div>
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Observações (Descrição do Pagamento)</label>
+                        <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows="3" style={styles.textarea}/>
+                    </div>
+                    
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Tipo de Pagamento</label>
+                        <div style={styles.radioGroup}>
+                            <label style={styles.radioLabel}>
+                                <input type="radio" value="normal" checked={paymentType === 'normal'} onChange={(e) => setPaymentType(e.target.value)} />
+                                Mensalidade Normal
+                            </label>
+                            <label style={styles.radioLabel}>
+                                <input type="radio" value="vip" checked={paymentType === 'vip'} onChange={(e) => setPaymentType(e.target.value)} />
+                                Assinatura VIP (30 dias)
+                            </label>
                         </div>
-                    )}
-                </>
+                    </div>
+
+                    <div style={styles.buttonContainer}>
+                        <button type="submit" disabled={isProcessing} style={styles.processButton}>
+                            {isProcessing ? 'Processando...' : 'Processar Pagamento'}
+                        </button>
+                        <button type="button" onClick={() => navigate(-1)} style={{...styles.backButton, position: 'static', marginTop: '10px'}}>
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
             )}
         </div>
     );
-}
+};
 
 // Estilos
-const containerStyle = {
-    padding: '20px',
-    maxWidth: '400px',
-    margin: 'auto',
-    textAlign: 'center',
-    fontFamily: 'sans-serif',
-    border: '2px solid #FFD700',
-    borderRadius: '15px',
-    boxShadow: '0 0 20px #FFD700',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    position: 'relative',
-    color: 'white'
+const styles = {
+    container: { padding: '20px', maxWidth: '600px', margin: '20px auto', backgroundColor: '#f8f9fa', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', fontFamily: 'Arial, sans-serif' },
+    loading: { textAlign: 'center', fontSize: '1.5em', color: '#333', marginTop: '50px' },
+    error: { textAlign: 'center', fontSize: '1.5em', color: '#dc3545', marginTop: '50px' },
+    header: { textAlign: 'center', marginBottom: '20px' },
+    title: { color: '#333', fontSize: '1.8em', marginBottom: '5px' },
+    studentName: { color: '#666', fontSize: '1.1em', marginTop: '0' },
+    form: { display: 'flex', flexDirection: 'column', gap: '15px' },
+    infoBox: { backgroundColor: '#e9ecef', padding: '15px', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '10px' },
+    strong: { fontWeight: 'bold', color: '#000' },
+    formGroup: { display: 'flex', flexDirection: 'column', gap: '5px' },
+    label: { fontWeight: 'bold', color: '#555' },
+    input: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', fontSize: '1rem' },
+    select: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', fontSize: '1rem' },
+    textarea: { padding: '10px', border: '1px solid #ccc', borderRadius: '5px', resize: 'vertical', fontSize: '1rem' },
+    radioGroup: { display: 'flex', gap: '20px', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '5px' },
+    radioLabel: { display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' },
+    buttonContainer: { marginTop: '10px', display: 'flex', flexDirection: 'column' },
+    processButton: { width: '100%', padding: '12px', fontSize: '1.1em', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', transition: 'background-color 0.3s ease' },
+    successContainer: { textAlign: 'center', padding: '20px' },
+    successTitle: { color: '#28a745' },
+    successActions: { marginTop: '30px', display: 'flex', flexDirection: 'column', gap: '10px' },
+    baseButton: { padding: '12px', fontSize: '1em', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' },
+    printButton: { backgroundColor: '#007bff', color: 'white' },
+    newPaymentButton: { backgroundColor: '#ffc107', color: '#212529' },
+    backButton: { backgroundColor: '#6c757d', color: 'white' }
 };
 
-const backButtonStyle = {
-    position: 'absolute', top: '10px', left: '10px', padding: '8px 12px',
-    fontSize: '0.9em', backgroundColor: '#333', color: 'white',
-    border: '1px solid #FFD700', borderRadius: '8px', cursor: 'pointer'
-};
-
-const titleStyle = { color: '#FFD700', textShadow: '0 0 10px #FFD700', marginBottom: '20px' };
-
-const formGroupStyle = { marginBottom: '15px' };
-
-const inputStyle = {
-    width: '100%',
-    padding: '10px', fontSize: '1em',
-    border: '1px solid #ccc', borderRadius: '5px',
-    backgroundColor: '#333', color: '#FFD700', 
-    boxSizing: 'border-box'
-};
-
-const textareaStyle = {
-    width: '100%', padding: '10px', fontSize: '1em',
-    border: '1px solid #ccc', borderRadius: '5px',
-    backgroundColor: '#333', color: 'white',
-    boxSizing: 'border-box'
-};
-
-const searchButtonStyle = {
-    padding: '10px 15px', fontSize: '1em', cursor: 'pointer',
-    backgroundColor: '#007bff', color: 'white',
-    border: 'none', borderRadius: '5px'
-};
-
-const studentInfoStyle = {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: '20px', borderRadius: '10px',
-    marginTop: '20px'
-};
-
-const studentNameStyle = {
-    fontSize: '1.5em', fontWeight: 'bold',
-    color: '#FFD700'
-};
-
-const labelStyle = {
-    display: 'block', marginBottom: '5px', fontSize: '1em', textAlign: 'left'
-};
-
-const selectStyle = {
-    width: '100%',
-    padding: '8px', fontSize: '1em',
-    border: '1px solid #ccc', borderRadius: '5px',
-    backgroundColor: '#333', color: 'white',
-    boxSizing: 'border-box'
-};
-
-const registerButtonStyle = {
-    marginTop: '20px', padding: '12px 20px',
-    fontSize: '1.2em', cursor: 'pointer',
-    backgroundColor: '#28a745', color: 'white',
-    border: 'none', borderRadius: '8px'
-};
-
-const feedbackStyle = {
-    marginTop: '20px', fontWeight: 'bold', color: '#dc3545'
-};
-
-const successMessageStyle = {
-    marginTop: '50px',
-};
-
-const printReceiptButtonStyle = {
-    padding: '12px 20px',
-    fontSize: '1em',
-    cursor: 'pointer',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    marginTop: '20px',
-    marginRight: '10px'
-};
-
-const newPaymentButtonStyle = {
-    padding: '12px 20px',
-    fontSize: '1em',
-    cursor: 'pointer',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    marginTop: '20px'
-};
-
-const warningStyle = { 
-    backgroundColor: '#dc3545', padding: '10px', borderRadius: '8px', 
-    margin: '15px 0', fontWeight: 'bold', color: 'white'
-};
-
-const onTimeStyle = {
-    backgroundColor: '#28a745', padding: '10px', borderRadius: '8px', 
-    margin: '15px 0', fontWeight: 'bold', color: 'white'
-};
+styles.printButton = { ...styles.baseButton, ...styles.printButton };
+styles.newPaymentButton = { ...styles.baseButton, ...styles.newPaymentButton };
+styles.backButton = { ...styles.baseButton, ...styles.backButton };
 
 export default PaymentScreen;

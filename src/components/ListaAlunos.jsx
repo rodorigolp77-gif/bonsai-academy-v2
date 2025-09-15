@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
+import { db } from "../firebaseConfig";
 import { collection, getDocs, orderBy, query, where, Timestamp } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import bonsaiLogo from '../assets/bonsai_logo.png';
@@ -53,27 +53,19 @@ const ListaAlunos = () => {
 
     const getStatusColor = (alunoStatus) => {
         switch (alunoStatus) {
-            case 'ativo':
-                return '#28a745';
-            case 'inativo':
-                return '#6c757d';
-            case 'atrasado':
-                return '#dc3545';
-            default:
-                return 'white';
+            case 'ativo': return '#28a745';
+            case 'inativo': return '#6c757d';
+            case 'atrasado': return '#dc3545';
+            default: return 'white';
         }
     };
 
     const getListItemBackground = (alunoStatus) => {
         switch (alunoStatus) {
-            case 'ativo':
-                return 'rgba(40, 167, 69, 0.1)';
-            case 'inativo':
-                return 'rgba(108, 117, 125, 0.1)';
-            case 'atrasado':
-                return 'rgba(220, 53, 69, 0.1)';
-            default:
-                return '#333';
+            case 'ativo': return 'rgba(40, 167, 69, 0.1)';
+            case 'inativo': return 'rgba(108, 117, 125, 0.1)';
+            case 'atrasado': return 'rgba(220, 53, 69, 0.1)';
+            default: return '#333';
         }
     };
 
@@ -90,7 +82,8 @@ const ListaAlunos = () => {
 
     return (
         <div style={containerStyle}>
-            <button onClick={() => navigate('/controle-academia')} style={backButtonStyle}>Voltar</button>
+            {/* ===== LINHA CORRIGIDA ABAIXO ===== */}
+            <button onClick={() => navigate('/dashboard')} style={backButtonStyle}>Voltar</button>
             <img src={bonsaiLogo} alt="Logo Bonsai Jiu Jitsu" style={logoStyle} />
             <h1 style={titleStyle}>
                 Controle de Alunos
@@ -127,7 +120,6 @@ const ListaAlunos = () => {
                                 style={detailsButton}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    // CORREÇÃO: A rota estava como '/estudante', alterado para '/student-details' para corresponder ao App.jsx
                                     navigate(`/student-details/${student.id}`);
                                 }}
                             >
@@ -143,9 +135,7 @@ const ListaAlunos = () => {
     );
 };
 
-
-
-// Estilos (sem alterações)
+// Estilos
 const containerStyle = {
     padding: '20px', maxWidth: '800px', margin: 'auto', textAlign: 'center', fontFamily: 'sans-serif',
     backgroundColor: '#1a1a1a', color: 'white', minHeight: '100vh', position: 'relative'

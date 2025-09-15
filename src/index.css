@@ -66,3 +66,65 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+/*
+  CORREÇÃO PARA O BUG DE SCROLL DO REACT-MODAL
+  Isso garante que, mesmo que a biblioteca tente esconder a barra de rolagem,
+  ela permanecerá visível e funcional.
+*/
+body.ReactModal__Body--open {
+  overflow: auto !important;
+  position: static !important;
+}/* ============================================= */
+/* ===== CORREÇÃO GLOBAL DE SCROLL E LAYOUT ===== */
+/* ============================================= */
+
+/* Garante que a estrutura principal ocupe toda a altura */
+html, body, #root, .app-container {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  position: relative; /* Necessário para o cálculo correto de altura */
+  overflow-y: auto !important; /* Força a barra de rolagem vertical a aparecer se necessário */
+}
+
+/* Garante que o container principal possa crescer além da tela */
+#root, .app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sobrescreve de forma mais agressiva a biblioteca de modal */
+body.ReactModal__Body--open {
+  overflow: auto !important;
+  position: static !important;
+}:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  /* Cor de fundo para as áreas fora do conteúdo principal */
+  background-color: #f0f2f5; 
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden; /* Previne a barra de rolagem horizontal */
+}
+
+/* Garante que o container do app ocupe a largura toda */
+#root, .app-container {
+  width: 100%;
+}
+
+/* Correção para o bug de scroll da biblioteca de modais */
+body.ReactModal__Body--open {
+  overflow: auto !important;
+  position: static !important;
+}

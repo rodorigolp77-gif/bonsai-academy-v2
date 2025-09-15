@@ -1,91 +1,103 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { auth, db } from './firebaseConfig.js'; 
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore'; 
+import { useAuth } from './contexts/AuthContext'; // Importa nosso hook de autenticação
 
-// --- Componentes ---
+// --- Páginas e Componentes ---
 import LoginPage from './components/LoginPage';
 import StudentDashboard from './components/StudentDashboard';
-import Dashboard from './components/Dashboard';
-import CheckinScreen from './components/CheckinScreen';
-import PaymentScreen from './components/PaymentScreen';
-import PresenceScreen from './components/PresenceScreen';
-import RegisterStudent from './components/RegisterStudent'; // <-- CORREÇÃO AQUI: removido '01'
-import StudentDetails from './components/StudentDetails';
-import ControleAcademia from './components/ControleAcademia';
-import ListaAlunos from './components/ListaAlunos';
-import FluxoDeCaixa from './components/FluxoDeCaixa';
-import ExportPage from './components/ExportPage'; 
-import GlobalStyle from './styles/GlobalStyle.jsx';
+import Dashboard from './components/Dashboard'; // Este é o seu Dashboard de Admin
+// Lembre-se de importar todos os outros componentes que você usa nas rotas!
+// Ex: import RegisterStudent from './components/RegisterStudent';
+
 import './App.css';
 
-function App() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+// --- COMPONENTES AUXILIARES (definidos fora para melhor performance) ---
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        // A lógica atual define o papel do usuário:
-        // Se o UID do usuário for encontrado na coleção 'alunos', ele é 'aluno'.
-        // Caso contrário, ele é tratado como 'admin'.
-        // Para gerenciamento de papéis mais robusto, considere armazenar papéis explícitos
-        // em uma coleção 'users' separada ou em um campo no próprio documento do aluno.
-        const alunosRef = collection(db, 'alunos');
-        const q = query(alunosRef, where("uid", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-        setUserRole(!querySnapshot.empty ? 'aluno' : 'admin');
-      } else {
-        setCurrentUser(null);
-        setUserRole(null);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+// Componente para proteger rotas que exigem login e um perfil específico
+const ProtectedRoute = ({ children, allowedRoles }) => {
+    const { currentUser, userRole, loading } = useAuth();
 
-  if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#1a1a1a', color: 'white' }}>Carregando...</div>;
-  }
-
-  const ProtectedRoute = ({ children, role }) => {
-    if (!currentUser) return <Navigate to="/login" replace />;
-    // Se o usuário está logado, mas seu papel não corresponde ao papel exigido para a rota,
-    // ele é redirecionado para o seu respectivo painel.
-    if (userRole && userRole !== role) {
-        return userRole === 'admin' ? <Navigate to="/dashboard" replace /> : <Navigate to="/aluno/dashboard" replace />;
+    if (loading) {
+        return <div className="loading-screen">Carregando...</div>;
+    }
+    if (!currentUser) {
+        return <Navigate to="/login" replace />;
+    }
+    if (allowedRoles && !allowedRoles.includes(userRole)) {
+        // Se o perfil não for permitido, redireciona para a página principal do perfil dele
+        if (userRole === 'admin') return <Navigate to="/dashboard" replace />;
+        if (userRole === 'aluno') return <Navigate to="/aluno/dashboard" replace />;
+        return <Navigate to="/" replace />; 
     }
     return children;
-  };
+};
 
-  return (
-    <Router>
-      <GlobalStyle />
-      <div className="app-container">
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          {/* Redireciona a rota raiz com base no status de login e no papel do usuário */}
-          <Route path="/" element={!currentUser ? <Navigate to="/login" replace /> : (userRole === 'admin' ? <Navigate to="/dashboard" replace /> : <Navigate to="/aluno/dashboard" replace />)} />
+// Componente para redirecionar o usuário para a página correta após o login
+const MainRedirect = () => {
+    const { currentUser, userRole, loading } = useAuth();
 
-          {/* Rotas protegidas */}
-          <Route path="/aluno/dashboard" element={<ProtectedRoute role="aluno"><StudentDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute role="admin"><Dashboard /></ProtectedRoute>} />
-          <Route path="/checkin" element={<ProtectedRoute role="admin"><CheckinScreen /></ProtectedRoute>} />
-          <Route path="/presence" element={<ProtectedRoute role="admin"><PresenceScreen /></ProtectedRoute>} />
-          <Route path="/register-student" element={<ProtectedRoute role="admin"><RegisterStudent /></ProtectedRoute>} /> {/* <-- USADO AQUI SEM '01' */}
-          <Route path="/student-details/:id" element={<ProtectedRoute role="admin"><StudentDetails /></ProtectedRoute>} />
-          <Route path="/payments/:id" element={<ProtectedRoute role="admin"><PaymentScreen /></ProtectedRoute>} />
-          <Route path="/controle-academia" element={<ProtectedRoute role="admin"><ControleAcademia /></ProtectedRoute>} />
-          <Route path="/fluxo-de-caixa" element={<ProtectedRoute role="admin"><FluxoDeCaixa /></ProtectedRoute>} />
-          <Route path="/export" element={<ProtectedRoute role="admin"><ExportPage /></ProtectedRoute>} />
-          <Route path="/lista-alunos/:filtro?/:valor?" element={<ProtectedRoute role="admin"><ListaAlunos /></ProtectedRoute>} />
-        </Routes>
-      </div>
-    </Router>
-  );
+    if (loading) {
+      return <div className="loading-screen">Verificando permissões...</div>;
+    }
+    if (!currentUser) {
+      return <Navigate to="/login" replace />;
+    }
+
+    if (userRole === 'admin') return <Navigate to="/dashboard" replace />;
+    if (userRole === 'aluno') return <Navigate to="/aluno/dashboard" replace />;
+    // Adicione outros perfis se necessário, ex: 'professor'
+    // if (userRole === 'professor') return <Navigate to="/professor/dashboard" replace />;
+    
+    // Caso o perfil não seja reconhecido, mostra uma mensagem.
+    return <div>Perfil de usuário não reconhecido. Por favor, contate o suporte.</div>;
+};
+
+
+// --- COMPONENTE PRINCIPAL DO APLICATIVO ---
+
+function App() {
+    return (
+        <Router>
+            <Routes>
+                {/* Rota Pública */}
+                <Route path="/login" element={<LoginPage />} />
+
+                {/* Rota Raiz: Redireciona o usuário logado para seu respectivo dashboard */}
+                <Route path="/" element={<MainRedirect />} />
+
+                {/* Rotas de Aluno */}
+                <Route 
+                    path="/aluno/dashboard" 
+                    element={
+                        <ProtectedRoute allowedRoles={['aluno', 'professor']}>
+                            <StudentDashboard />
+                        </ProtectedRoute>
+                    } 
+                />
+
+                {/* Rotas de Admin */}
+                <Route 
+                    path="/dashboard" 
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    } 
+                />
+                
+                {/* Adicione aqui TODAS as suas outras rotas protegidas. Exemplo:
+                <Route 
+                    path="/register-student" 
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <RegisterStudent />
+                        </ProtectedRoute>
+                    } 
+                />
+                */}
+            </Routes>
+        </Router>
+    );
 }
 
 export default App;

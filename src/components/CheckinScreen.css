@@ -1,0 +1,303 @@
+/* src/components/CheckinScreen.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+body {
+    margin: 0;
+    overflow: hidden;
+}
+
+.checkin-background {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #0d0d0d;
+    background-image: radial-gradient(circle at center, #1a1a1a, #0d0d0d 80%);
+    font-family: 'Orbitron', sans-serif;
+    position: relative;
+    overflow: hidden;
+}
+
+/* O admin-access-button fixo foi removido, pois agora está no keypad */
+
+/* Base da Porta do Cofre */
+.vault-door {
+    position: relative;
+    width: 90vw; /* Adapta-se à largura da tela */
+    height: 90vh; /* Adapta-se à altura da tela */
+    max-width: 900px; /* Limite máximo para telas grandes */
+    max-height: 900px; /* Limite máximo */
+    background-color: #2a2a2a;
+    border: 8px solid #444;
+    border-radius: 10px;
+    box-shadow:
+        inset 0 0 20px rgba(0,0,0,0.8),
+        0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    background-image:
+        linear-gradient(to right, #333 1px, transparent 1px),
+        linear-gradient(to bottom, #333 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Detalhes da porta - Padrão Geométrico */
+.vault-door::before, .vault-door::after {
+    content: '';
+    position: absolute;
+    border: 2px solid #3d3d3d;
+    opacity: 0.8;
+}
+
+.vault-door::before {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: skewY(20deg);
+    transform-origin: top left;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+.vault-door::after {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: skewY(-20deg);
+    transform-origin: top left;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+/* Dobradiças */
+.vault-hinge {
+    position: absolute;
+    width: 40px;
+    height: 150px;
+    background-color: #383838;
+    border: 2px solid #555;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+    border-radius: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+}
+.vault-hinge.left { left: -20px; }
+.vault-hinge.right { right: -20px; }
+.vault-hinge::before, .vault-hinge::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    background-color: #444;
+    border-radius: 50%;
+    border: 1px solid #666;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+    left: 50%;
+    transform: translateX(-50%);
+}
+.vault-hinge::before { top: 20px; }
+.vault-hinge::after { bottom: 20px; }
+
+/* Maçanetas/Travas Laterais */
+.vault-handle {
+    position: absolute;
+    width: 30px;
+    height: 80px;
+    background-color: #383838;
+    border: 2px solid #555;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+    border-radius: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+}
+.vault-handle.left { left: 80px; }
+.vault-handle.right { right: 80px; }
+.vault-handle::before {
+    content: '';
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-color: #4a4a4a;
+    border: 2px solid #666;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0,0,0,0.7), inset 0 0 10px rgba(0,0,0,0.5);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Novo wrapper para o conteúdo central da porta */
+.vault-center-panel-wrapper {
+    width: 80%; /* Ajuste para ter margem */
+    height: 80%;
+    background-color: #1a1a1a; /* Fundo do painel interno */
+    border: 5px solid #444;
+    border-radius: 15px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 0 25px rgba(0,0,0,0.7);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between; /* Distribui o espaço */
+    z-index: 2;
+    box-sizing: border-box;
+}
+
+.vault-screen-time {
+    color: #ff3b3b;
+    font-size: 1.2em; /* Maior para tablet */
+    text-shadow: 0 0 8px #ff3b3b;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Botões de alternar modo (ID Manual / QR Code) */
+.mode-toggle-buttons {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.mode-button {
+    padding: 10px 20px;
+    border: 2px solid #ff3b3b;
+    border-radius: 8px;
+    background-color: transparent;
+    color: #ff3b3b;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 10px rgba(255, 59, 59, 0.4);
+}
+
+.mode-button:hover {
+    background-color: rgba(255, 59, 59, 0.1);
+    box-shadow: 0 0 15px rgba(255, 59, 59, 0.6);
+}
+
+.mode-button.active {
+    background-color: #ff3b3b;
+    color: #0d0d0d;
+    box-shadow: 0 0 20px rgba(255, 59, 59, 0.8), inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+/* Container do Scanner QR */
+.qr-scanner-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1; /* Ocupa o espaço disponível */
+    width: 100%;
+    margin-top: 10px;
+}
+
+.qr-scanner-prompt {
+    color: #00ff41;
+    font-size: 1.2em;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.7);
+    margin-bottom: 15px;
+}
+
+.qr-reader-frame {
+    width: 80%; /* Ajuste a largura do frame do QR */
+    max-width: 300px; /* Limite para não ficar muito grande */
+    aspect-ratio: 1 / 1; /* Mantém proporção quadrada */
+    border: 3px solid #00ff41; /* Borda neon verde */
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: black;
+}
+
+/* Feedback message (ajustes para encaixar no novo layout) */
+.vault-feedback-message {
+    color: #ff3b3b;
+    font-size: 1em;
+    margin-top: 15px;
+    min-height: 25px; /* Para manter o layout fixo mesmo sem mensagem */
+    text-align: center;
+    text-shadow: 0 0 8px rgba(255, 59, 59, 0.7);
+}
+
+
+/* Modals - Mantidos próximos ao design anterior */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 2000;
+}
+.modal-content {
+    background-color: #1f1f1f;
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%; max-width: 400px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(255, 215, 0, 0.5), inset 0 0 20px rgba(255, 215, 0, 0.3);
+    border: 2px solid #FFD700;
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.modal-title { color: #FFD700; font-size: 1.5em; margin-bottom: 15px; text-shadow: 0 0 10px #FFD700; }
+.modal-name { color: white; font-size: 2.5em; margin: 10px 0 20px; text-shadow: 0 0 15px rgba(255,255,255,0.8); }
+.modal-message { color: #ccc; font-size: 1.1em; line-height: 1.4; margin-bottom: 20px; }
+.modal-training-message { color: #00ff41; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 8px rgba(0,255,65,0.7); }
+
+.modal-close-button, .modal-confirm-button, .modal-cancel-button {
+    padding: 12px 35px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2em;
+    font-family: 'Orbitron', sans-serif;
+    margin-top: 25px;
+    transition: all 0.2s ease;
+}
+.modal-close-button, .modal-confirm-button {
+    background-color: #00ff41;
+    color: #111;
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.7);
+}
+.modal-close-button:hover, .modal-confirm-button:hover {
+    background-color: #00e03a;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.9);
+}
+
+.modal-cancel-button {
+    background-color: #ff3b3b;
+    color: white;
+    box-shadow: 0 0 15px rgba(255, 59, 59, 0.7);
+}
+.modal-cancel-button:hover {
+    background-color: #e03b3b;
+    box-shadow: 0 0 20px rgba(255, 59, 59, 0.9);
+}
+
+.password-input {
+    width: 100%; padding: 12px; margin: 8px 0; text-align: center; font-size: 1.1em;
+    border: 2px solid #555; border-radius: 8px; box-sizing: border-box; background-color: #000; color: #ff3b3b;
+    font-family: 'Orbitron', sans-serif;
+    text-shadow: 0 0 5px #ff3b3b;
+    outline: none;
+}
+.password-input:focus {
+    border-color: #ff3b3b;
+    box-shadow: 0 0 10px rgba(255, 59, 59, 0.5);
+}

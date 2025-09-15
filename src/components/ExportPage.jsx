@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db } from '../../firebaseConfig'; // USE ESTA LINHA (note o `../../`)
 import { useNavigate } from 'react-router-dom';
 
 function ExportPage() {

@@ -2,41 +2,56 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '../firebaseConfig';
-import bonsaiLogo from '../assets/bonsai_logo.png';
+import { db } from "../firebaseConfig";
+import { FaSignOutAlt } from 'react-icons/fa';
 import OverdueStudents from './OverdueStudents';
+import bonsaiLogo from '../assets/bonsai_logo.png';
+import './Dashboard.css'; 
+
+// --- IMAGENS PARA OS BOTÕES ---
+import registerStudentImg from '../assets/cadastro.jpg';
+import studentListImg from '../assets/lista-alunos.png';
+import manageEventsImg from '../assets/evento.jpg';
+import cashFlowImg from '../assets/recibo.jpg';
+import checkinImg from '../assets/checkin.jpg';
+import presenceImg from '../assets/presenca.jpg';
+import videoImg from '../assets/videoaula.jpg';
+import resultsImg from '../assets/resultados.jpg';
+import categoriesImg from '../assets/evento.jpg';
+import noticesImg from '../assets/evento.jpg';
+import scheduleImg from '../assets/aulas.jpg';
+import healthImg from '../assets/saude.png';
+import gerenciarPlanosImg from '../assets/gerenciarplanos.png';
 
 function Dashboard() {
     const navigate = useNavigate();
-    const [searchId, setSearchId] = useState('');
     const [searchName, setSearchName] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [message, setMessage] = useState('');
+    const [dueDayFilter, setDueDayFilter] = useState(null);
+    const [dueStudents, setDueStudents] = useState([]);
+    const [loadingDue, setLoadingDue] = useState(false);
 
     const fetchStudentsByName = useCallback(async (name) => {
-        if (!name) {
-            setSearchResults([]);
-            setMessage('');
-            return;
+        if (!name) { 
+            setSearchResults([]); 
+            setMessage(''); 
+            return; 
         }
-
         setIsSearching(true);
         setMessage('');
         try {
             const end = name + '\uf8ff';
-            const q = query(
-                collection(db, 'alunos'),
-                where('nome', '>=', name),
-                where('nome', '<=', end)
-            );
+            const q = query(collection(db, 'alunos'), where('nome', '>=', name), where('nome', '<=', end));
             const querySnapshot = await getDocs(q);
             const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
             if (results.length === 0) {
                 setMessage("Nenhum aluno encontrado.");
+                setSearchResults([]);
             } else {
                 setSearchResults(results);
+                setMessage('');
             }
         } catch (error) {
             console.error("Erro ao buscar alunos por nome:", error);
@@ -47,48 +62,38 @@ function Dashboard() {
     }, []);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchStudentsByName(searchName);
-        }, 500);
+        const timer = setTimeout(() => { fetchStudentsByName(searchName); }, 500);
         return () => clearTimeout(timer);
     }, [searchName, fetchStudentsByName]);
 
-    const handleSearchById = async (e) => {
-        e.preventDefault();
-        setIsSearching(true);
-        setSearchResults([]);
-        setMessage('');
-
-        // --- CORREÇÃO APLICADA AQUI ---
-        if (!searchId.trim()) {
-            setMessage("Por favor, insira um ID para buscar.");
-            setIsSearching(false);
-            return;
-        }
-        
+    const fetchStudentsByDueDate = async (day) => {
+        setDueDayFilter(day);
+        setLoadingDue(true);
+        setDueStudents([]);
         try {
-            // Procura pelo 'aluno_id' como TEXTO (string), não como número
-            const q = query(collection(db, 'alunos'), where('aluno_id', '==', searchId.trim()));
+            const q = query(collection(db, 'alunos'), where('status', '==', 'ativo'));
             const querySnapshot = await getDocs(q);
-            const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const allActiveStudents = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            const filteredStudents = allActiveStudents.filter(student => {
+                if (student.data_vencimento && student.data_vencimento.toDate) {
+                    return student.data_vencimento.toDate().getDate() === day;
+                }
+                return false;
+            });
 
-            if (results.length === 0) {
-                setMessage("Nenhum aluno encontrado com este ID.");
-            } else {
-                setSearchResults(results);
-            }
+            setDueStudents(filteredStudents);
         } catch (error) {
-            console.error("Erro ao buscar alunos por ID:", error);
-            setMessage("Ocorreu um erro ao buscar.");
+            console.error("Erro ao buscar alunos por vencimento:", error);
+            setMessage("Erro ao buscar alunos por vencimento.");
         } finally {
-            setIsSearching(false);
+            setLoadingDue(false);
         }
     };
 
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            alert("Você saiu com sucesso.");
             navigate('/');
         } catch (error) {
             console.error("Erro ao sair:", error);
@@ -96,93 +101,102 @@ function Dashboard() {
     };
 
     return (
-        <div style={containerStyle}>
-            <img src={bonsaiLogo} alt="Logo Bonsai Jiu Jitsu" style={logoStyle} />
-            <h2 style={titleStyle}>Painel do Administrador</h2>
-            <p style={subtitleStyle}>Selecione uma opção abaixo:</p>
-            
-            <div style={searchContainerStyle}>
-                <h3 style={searchTitleStyle}>Buscar Aluno por Nome</h3>
-                <input 
-                    type="text" 
-                    placeholder="Comece a digitar o nome" 
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                    style={searchInputStyle}
-                />
-            </div>
+        <div className="admin-dashboard-container">
+            <header className="admin-dashboard-header">
+                <div className="header-brand">
+                    <img src={bonsaiLogo} alt="Bonsai Logo" className="header-logo" />
+                    <div className="academy-title">
+                        <h1 className="bonsai-line">BONSAI</h1>
+                        <p className="academy-line">JIU JITSU ACADEMY</p>
+                    </div>
+                </div>
+                <button onClick={handleLogout} className="logout-button-simple">
+                    <FaSignOutAlt />
+                    <span>Sair</span>
+                </button>
+            </header>
 
-            <div style={searchContainerStyle}>
-                <h3 style={searchTitleStyle}>Ou buscar por ID</h3>
-                <form onSubmit={handleSearchById}>
+            <nav className="admin-dashboard-nav">
+                <button onClick={() => navigate('/register-student')} style={{ backgroundImage: `url(${registerStudentImg})` }}>Cadastrar Aluno</button>
+                <button onClick={() => navigate('/lista-alunos')} style={{ backgroundImage: `url(${studentListImg})` }}>Gerenciar Alunos</button>
+                <button onClick={() => navigate('/fluxo-de-caixa')} style={{ backgroundImage: `url(${cashFlowImg})` }}>Gerenciar Fluxo</button>
+                <button onClick={() => navigate('/gerenciar-saude')} style={{ backgroundImage: `url(${healthImg})` }}>Gerenciar Saúde</button>
+                <button onClick={() => navigate('/checkin')} style={{ backgroundImage: `url(${checkinImg})` }}>Check-in</button>
+                <button onClick={() => navigate('/presence')} style={{ backgroundImage: `url(${presenceImg})` }}>Presença de Hoje</button>
+                <button onClick={() => navigate('/gerenciar-planos')} style={{ backgroundImage: `url(${gerenciarPlanosImg})` }}>Gerenciar Planos</button>
+                <button onClick={() => navigate('/gerenciar-eventos')} style={{ backgroundImage: `url(${manageEventsImg})` }}>Gerenciar Eventos</button>
+                <button onClick={() => navigate('/gerenciar-videos')} style={{ backgroundImage: `url(${videoImg})` }}>Gerenciar Vídeos</button>
+                <button onClick={() => navigate('/gerenciar-resultados')} style={{ backgroundImage: `url(${resultsImg})` }}>Gerenciar Resultados</button>
+                <button onClick={() => navigate('/gerenciar-categorias')} style={{ backgroundImage: `url(${categoriesImg})` }}>Gerenciar Categorias</button>
+                <button onClick={() => navigate('/gerenciar-avisos')} style={{ backgroundImage: `url(${noticesImg})` }}>Gerenciar Avisos</button>
+                <button onClick={() => navigate('/gerenciar-aulas')} style={{ backgroundImage: `url(${scheduleImg})` }}>Gerenciar Aulas</button>
+            </nav>
+
+            <main className="admin-dashboard-content">
+                <section>
+                    <h2 className="section-title">Buscar Aluno por Nome</h2>
                     <input 
                         type="text" 
-                        placeholder="ID (ex: 1234)" 
-                        value={searchId}
-                        onChange={(e) => setSearchId(e.target.value)}
-                        style={searchInputStyle}
+                        placeholder="Comece a digitar o nome para buscar..." 
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                        className="search-input"
                     />
-                    <button type="submit" style={searchButtonStyle} disabled={isSearching}>
-                        {isSearching ? 'Buscando...' : 'Buscar'}
-                    </button>
-                </form>
-            </div>
-            
-            <hr style={dividerStyle} />
-            <div style={searchResultsContainerStyle}>
-                <h3 style={searchResultsTitleStyle}>Resultados da Busca</h3>
-                {isSearching ? (
-                    <p style={loadingStyle}>Buscando...</p>
-                ) : message ? (
-                    <p style={messageStyle}>{message}</p>
-                ) : (
-                    <ul style={resultsListStyle}>
-                        {searchResults.map(aluno => (
-                            <li key={aluno.id} style={resultItemStyle}>
-                                <span style={resultNameStyle}>{aluno.nome}</span>
-                                <span style={resultIdStyle}>ID: {aluno.aluno_id}</span>
-                                <button onClick={() => navigate(`/student-details/${aluno.id}`)} style={viewButtonStyle}>Ver Detalhes</button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-            
-            <hr style={dividerStyle} />
-            <div style={buttonContainerStyle}>
-                <button onClick={() => navigate('/controle-academia')} style={buttonStyle}>Controle da Academia</button>
-                <button onClick={() => navigate('/presence')} style={buttonStyle}>Presença de Hoje</button>
-                <button onClick={() => navigate('/register-student')} style={buttonStyle}>Cadastrar Novo Aluno</button>
-                <button onClick={() => navigate('/checkin')} style={buttonStyle}>Ir para Check-in</button>
-                <button onClick={handleLogout} style={logoutButtonStyle}>Sair</button>
-            </div>
+                    <div className="search-results-container">
+                        {isSearching ? <p>Buscando...</p> : message ? <p>{message}</p> : (
+                            <ul className="results-list">
+                                {searchResults.map(aluno => (
+                                    <li key={aluno.id} className="result-item">
+                                        <span className="result-name">{aluno.nome}</span>
+                                        <span className="result-id">ID: {aluno.aluno_id}</span>
+                                        <div>
+                                            <button onClick={() => navigate(`/student-details/${aluno.id}`)} className="details-button">Ver Detalhes</button>
+                                            <button onClick={() => navigate(`/payments/${aluno.id}`)} className="payment-button">Pagamento</button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </section>
+                
+                <OverdueStudents navigate={navigate} />
 
-            <OverdueStudents navigate={navigate} />
+                <section>
+                    <h2 className="section-title">A Receber no Dia</h2>
+                    <div className="due-day-filter">
+                        {[1, 10, 20, 28].map(day => (
+                            <button 
+                                key={day}
+                                className={`filter-button ${dueDayFilter === day ? 'active' : ''}`}
+                                onClick={() => fetchStudentsByDueDate(day)}
+                            >
+                                Dia {day}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="search-results-container">
+                        {loadingDue ? <p>Buscando...</p> : dueStudents.length > 0 ? (
+                            <ul className="results-list">
+                                {dueStudents.map(aluno => (
+                                    <li key={aluno.id} className="result-item">
+                                        <span className="result-name">{aluno.nome}</span>
+                                        <span className="result-id">Mensalidade: ¥{aluno.mensalidade?.toLocaleString('ja-JP')}</span>
+                                        <div>
+                                            <button onClick={() => navigate(`/student-details/${aluno.id}`)} className="details-button">Ver Detalhes</button>
+                                            <button onClick={() => navigate(`/payments/${aluno.id}`)} className="payment-button">Pagamento</button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            dueDayFilter && <p>Nenhum aluno com vencimento para o dia {dueDayFilter} encontrado.</p>
+                        )}
+                    </div>
+                </section>
+            </main>
         </div>
     );
 }
-
-// Estilos
-const containerStyle = { padding: '20px', maxWidth: '600px', margin: 'auto', textAlign: 'center', fontFamily: 'sans-serif', border: '2px solid #FFD700', borderRadius: '15px', boxShadow: '0 0 20px #FFD700', backgroundColor: 'rgba(255, 255, 255, 0.05)', position: 'relative', color: 'white' };
-const logoStyle = { width: '150px', marginBottom: '10px' };
-const titleStyle = { color: '#FFD700', textShadow: '0 0 10px #FFD700' };
-const subtitleStyle = { color: 'white' };
-const searchContainerStyle = { marginBottom: '30px', padding: '20px', border: '1px solid #ddd', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.05)' };
-const searchTitleStyle = { color: '#FFD700', fontSize: '1.2em' };
-const searchInputStyle = { padding: '10px', fontSize: '1em', border: '1px solid #ccc', borderRadius: '5px', width: 'calc(100% - 22px)', marginBottom: '10px', backgroundColor: '#333', color: 'white' };
-const searchButtonStyle = { padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%', transition: 'background-color 0.2s' };
-const buttonContainerStyle = { display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '30px' };
-const buttonStyle = { padding: '15px', backgroundColor: '#FFD700', color: '#333', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', transition: 'background-color 0.2s', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)', cursor: 'pointer', border: 'none' };
-const logoutButtonStyle = { padding: '15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' };
-const dividerStyle = { borderTop: '1px solid #FFD700', margin: '20px 0' };
-const searchResultsContainerStyle = { margin: '20px 0' };
-const searchResultsTitleStyle = { color: '#FFD700', fontSize: '1.2em' };
-const resultsListStyle = { listStyleType: 'none', padding: '0' };
-const resultItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', marginBottom: '10px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '8px', border: '1px solid #FFD700' };
-const resultNameStyle = { fontWeight: 'bold', flexGrow: 1, textAlign: 'left' };
-const resultIdStyle = { fontSize: '0.9em', color: '#ccc', marginRight: '10px' };
-const viewButtonStyle = { padding: '8px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
-const messageStyle = { color: '#dc3545', fontStyle: 'italic', marginTop: '10px' };
-const loadingStyle = { color: '#FFD700', fontStyle: 'italic', marginTop: '10px' };
 
 export default Dashboard;

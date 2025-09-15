@@ -1,34 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, where, Timestamp, updateDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db } from "../firebaseConfig";
 import bonsaiLogo from '../assets/bonsai_logo.png';
 
 function FluxoDeCaixa() {
     const navigate = useNavigate();
-    const [entradas, setEntradas] = useState([]);
-    const [saidas, setSaidas] = useState([]);
-    const [despesasFixas, setDespesasFixas] = useState([]);
+    const [transacoes, setTransacoes] = useState([]);
     const [descricao, setDescricao] = useState('');
     const [valor, setValor] = useState('');
-    const [tipo, setTipo] = useState('entrada');
+    const [tipo, setTipo] = useState('saida');
     const [isFixa, setIsFixa] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState(null);
+    const [mesSelecionado, setMesSelecionado] = useState(new Date().getMonth());
+    const [anoSelecionado, setAnoSelecionado] = useState(new Date().getFullYear());
 
     const fetchTransacoes = async () => {
         try {
-            const transacoesRef = collection(db, 'fluxo_de_caixa');
-            const q = query(transacoesRef, orderBy('data', 'desc'));
-            const querySnapshot = await getDocs(q);
-            const transacoesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const pagamentosRef = collection(db, 'pagamentos');
+            const pagamentosQuery = query(pagamentosRef, orderBy('data_pagamento', 'desc'));
+            const pagamentosSnapshot = await getDocs(pagamentosQuery);
+            
+            const pagamentosList = pagamentosSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                tipo: 'entrada',
+                data: doc.data().data_pagamento,
+                descricao: `Pagamento de ${doc.data().nome} - ${doc.data().observacoes || 'Mensalidade'}`,
+                valor: doc.data().valor_pago,
+            }));
 
-            const entradasFiltradas = transacoesList.filter(t => t.tipo === 'entrada');
-            const saidasNaoFixas = transacoesList.filter(t => t.tipo === 'saida' && !t.isFixa);
-            const saidasFixas = transacoesList.filter(t => t.tipo === 'saida' && t.isFixa);
+            const fluxoCaixaRef = collection(db, 'fluxo_de_caixa');
+            const fluxoCaixaQuery = query(fluxoCaixaRef, orderBy('data', 'desc'));
+            const fluxoCaixaSnapshot = await getDocs(fluxoCaixaQuery);
+            const fluxoCaixaList = fluxoCaixaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            setEntradas(entradasFiltradas);
-            setSaidas(saidasNaoFixas);
-            setDespesasFixas(saidasFixas);
+            const todasTransacoes = [...pagamentosList, ...fluxoCaixaList];
+            todasTransacoes.sort((a, b) => b.data.toDate() - a.data.toDate());
+            
+            setTransacoes(todasTransacoes);
+
         } catch (error) {
             console.error("Erro ao buscar transações:", error);
         }
@@ -45,7 +56,6 @@ function FluxoDeCaixa() {
                 descricao,
                 valor: parseFloat(valor),
                 tipo,
-                categoria: '',
                 isFixa: tipo === 'saida' ? isFixa : false,
             };
 
@@ -56,7 +66,7 @@ function FluxoDeCaixa() {
             } else {
                 await addDoc(collection(db, 'fluxo_de_caixa'), {
                     ...transactionData,
-                    data: new Date(),
+                    data: Timestamp.now(),
                 });
                 alert('Transação adicionada com sucesso!');
             }
@@ -68,8 +78,12 @@ function FluxoDeCaixa() {
             alert('Erro ao salvar transação. Verifique o console para mais detalhes.');
         }
     };
-
+    
     const handleEditTransaction = (transaction) => {
+        if (transaction.nome) {
+            alert("Pagamentos de alunos não podem ser editados aqui. Altere no perfil do aluno.");
+            return;
+        }
         setEditingTransaction(transaction);
         setDescricao(transaction.descricao);
         setValor(transaction.valor.toString());
@@ -81,129 +95,17 @@ function FluxoDeCaixa() {
         setEditingTransaction(null);
         setDescricao('');
         setValor('');
-        setTipo('entrada');
+        setTipo('saida');
         setIsFixa(false);
     };
-
-    const handleFetchStudentPayments = async () => {
-        try {
-            const hoje = new Date();
-            const semanaPassada = new Date(hoje);
-            semanaPassada.setDate(hoje.getDate() - 7);
-
-            const pagamentosRef = collection(db, 'pagamentos');
-            const q = query(
-                pagamentosRef,
-                where('data_pagamento', '>=', Timestamp.fromDate(semanaPassada)),
-                where('data_pagamento', '<=', Timestamp.fromDate(hoje))
-            );
-            const querySnapshot = await getDocs(q);
-            
-            let totalPagamentos = 0;
-            querySnapshot.forEach(doc => {
-                totalPagamentos += doc.data().valor_pago || 0;
-            });
-
-            if (totalPagamentos > 0) {
-                await addDoc(collection(db, 'fluxo_de_caixa'), {
-                    descricao: `Total de mensalidades da semana (${semanaPassada.toLocaleDateString()} - ${hoje.toLocaleDateString()})`,
-                    valor: totalPagamentos,
-                    tipo: 'entrada',
-                    categoria: 'Mensalidades',
-                    isFixa: false,
-                    data: new Date(),
-                });
-                alert(`Total de ¥${totalPagamentos} inserido no fluxo de caixa!`);
-                await fetchTransacoes();
-            } else {
-                alert('Nenhum pagamento encontrado na última semana.');
-            }
-        } catch (error) {
-            console.error("Erro ao buscar pagamentos dos alunos:", error);
-            alert('Erro ao buscar pagamentos. Verifique o console para mais detalhes.');
+    
+    const handleDeleteTransacao = async (id, isPayment) => {
+        if (isPayment) {
+            alert("Pagamentos de alunos não podem ser excluídos do fluxo de caixa. Para estornar, adicione uma transação de saída manualmente.");
+            return;
         }
-    };
 
-    const handleFetchMonthlyPayments = async () => {
-        try {
-            const hoje = new Date();
-            const mesPassado = new Date(hoje);
-            mesPassado.setMonth(hoje.getMonth() - 1);
-            
-            const pagamentosRef = collection(db, 'pagamentos');
-            const q = query(
-                pagamentosRef,
-                where('data_pagamento', '>=', Timestamp.fromDate(mesPassado)),
-                where('data_pagamento', '<=', Timestamp.fromDate(hoje))
-            );
-            const querySnapshot = await getDocs(q);
-
-            let totalPagamentos = 0;
-            querySnapshot.forEach(doc => {
-                totalPagamentos += doc.data().valor_pago || 0;
-            });
-
-            if (totalPagamentos > 0) {
-                await addDoc(collection(db, 'fluxo_de_caixa'), {
-                    descricao: `Total de mensalidades do mês (${mesPassado.toLocaleDateString()} - ${hoje.toLocaleDateString()})`,
-                    valor: totalPagamentos,
-                    tipo: 'entrada',
-                    categoria: 'Mensalidades',
-                    isFixa: false,
-                    data: new Date(),
-                });
-                alert(`Total de ¥${totalPagamentos} inserido no fluxo de caixa do último mês!`);
-                await fetchTransacoes();
-            } else {
-                alert('Nenhum pagamento encontrado no último mês.');
-            }
-        } catch (error) {
-            console.error("Erro ao buscar pagamentos mensais:", error);
-            alert('Erro ao buscar pagamentos. Verifique o console para mais detalhes.');
-        }
-    };
-
-    const handleFetchAnnualPayments = async () => {
-        try {
-            const hoje = new Date();
-            const anoPassado = new Date(hoje);
-            anoPassado.setFullYear(hoje.getFullYear() - 1);
-            
-            const pagamentosRef = collection(db, 'pagamentos');
-            const q = query(
-                pagamentosRef,
-                where('data_pagamento', '>=', Timestamp.fromDate(anoPassado)),
-                where('data_pagamento', '<=', Timestamp.fromDate(hoje))
-            );
-            const querySnapshot = await getDocs(q);
-
-            let totalPagamentos = 0;
-            querySnapshot.forEach(doc => {
-                totalPagamentos += doc.data().valor_pago || 0;
-            });
-
-            if (totalPagamentos > 0) {
-                await addDoc(collection(db, 'fluxo_de_caixa'), {
-                    descricao: `Total de mensalidades do ano (${anoPassado.toLocaleDateString()} - ${hoje.toLocaleDateString()})`,
-                    valor: totalPagamentos,
-                    tipo: 'entrada',
-                    categoria: 'Mensalidades',
-                    isFixa: false,
-                    data: new Date(),
-                });
-                alert(`Total de ¥${totalPagamentos} inserido no fluxo de caixa do último ano!`);
-                await fetchTransacoes();
-            } else {
-                alert('Nenhum pagamento encontrado no último ano.');
-            }
-        } catch (error) {
-            console.error("Erro ao buscar pagamentos anuais:", error);
-            alert('Erro ao buscar pagamentos. Verifique o console para mais detalhes.');
-        }
-    };
-
-    const handleDeleteTransacao = async (id) => {
-        if (window.confirm("Tem certeza que deseja excluir esta transação?")) {
+        if (window.confirm("Tem certeza que deseja excluir esta transação manual?")) {
             try {
                 await deleteDoc(doc(db, 'fluxo_de_caixa', id));
                 await fetchTransacoes();
@@ -214,46 +116,29 @@ function FluxoDeCaixa() {
         }
     };
 
-    // NOVA FUNÇÃO: Deleta todos os dados do mês atual
-    const handleDeleteMonthData = async () => {
-        if (window.confirm("ATENÇÃO: Isso irá DELETAR TODAS as transações do mês atual. Tem certeza que deseja continuar?")) {
-            try {
-                const hoje = new Date();
-                const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-                const ultimoDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    const transacoesFiltradas = transacoes.filter(t => {
+        const dataTransacao = t.data.toDate();
+        return dataTransacao.getMonth() === mesSelecionado && dataTransacao.getFullYear() === anoSelecionado;
+    });
 
-                const transacoesRef = collection(db, 'fluxo_de_caixa');
-                const q = query(
-                    transacoesRef,
-                    where('data', '>=', Timestamp.fromDate(primeiroDiaDoMes)),
-                    where('data', '<=', Timestamp.fromDate(ultimoDiaDoMes))
-                );
-                
-                const querySnapshot = await getDocs(q);
-                const deletePromises = querySnapshot.docs.map(docToDelete => deleteDoc(doc(db, 'fluxo_de_caixa', docToDelete.id)));
-                
-                await Promise.all(deletePromises);
-                
-                alert('Todos os dados do mês atual foram deletados com sucesso.');
-                await fetchTransacoes();
-            } catch (error) {
-                console.error("Erro ao deletar dados do mês:", error);
-                alert('Erro ao deletar dados. Verifique o console para mais detalhes.');
-            }
-        }
-    };
+    const entradas = transacoesFiltradas.filter(t => t.tipo === 'entrada');
+    const saidas = transacoesFiltradas.filter(t => t.tipo === 'saida');
 
-    const handleNavigateToExport = () => {
-        navigate('/export');
-    };
-
-    const totalEntradas = entradas.reduce((acc, t) => acc + t.valor, 0);
-    const totalSaidasFixas = despesasFixas.reduce((acc, t) => acc + t.valor, 0);
-    const totalSaidasVariaveis = saidas.reduce((acc, t) => acc + t.valor, 0);
-    const totalSaidas = totalSaidasFixas + totalSaidasVariaveis;
+    const totalEntradas = entradas.reduce((acc, t) => acc + (t.valor || 0), 0);
+    const totalSaidas = saidas.reduce((acc, t) => acc + (t.valor || 0), 0);
     const saldo = totalEntradas - totalSaidas;
+    
+    const formatCurrency = (value) => {
+        if (typeof value !== 'number' || isNaN(value)) {
+            return '¥ 0';
+        }
+        return `¥ ${value.toLocaleString('ja-JP')}`;
+    };
 
-    const formatCurrency = (value) => `¥ ${value.toFixed(0)}`;
+    const formatDate = (timestamp) => timestamp ? timestamp.toDate().toLocaleDateString('pt-BR') : 'N/A';
+
+    const meses = Array.from({length: 12}, (_, i) => new Date(0, i).toLocaleString('pt-BR', { month: 'long' }));
+    const anos = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
 
     return (
         <div style={containerStyle}>
@@ -263,10 +148,20 @@ function FluxoDeCaixa() {
             <div style={resumoStyle}>
                 <p style={{...resumoItemStyle, color: 'green'}}>Total de Entradas: {formatCurrency(totalEntradas)}</p>
                 <p style={{...resumoItemStyle, color: 'red'}}>Total de Saídas: {formatCurrency(totalSaidas)}</p>
-                <p style={{...resumoItemStyle, fontWeight: 'bold', color: saldo >= 0 ? 'green' : 'red'}}>Saldo Atual: {formatCurrency(saldo)}</p>
+                <p style={{...resumoItemStyle, fontWeight: 'bold', color: saldo >= 0 ? 'green' : 'red'}}>Saldo do Mês: {formatCurrency(saldo)}</p>
+            </div>
+
+            <div style={filterContainerStyle}>
+                <select value={mesSelecionado} onChange={(e) => setMesSelecionado(Number(e.target.value))} style={selectStyle}>
+                    {meses.map((mes, index) => <option key={index} value={index}>{mes.charAt(0).toUpperCase() + mes.slice(1)}</option>)}
+                </select>
+                <select value={anoSelecionado} onChange={(e) => setAnoSelecionado(Number(e.target.value))} style={selectStyle}>
+                    {anos.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+                </select>
             </div>
             
             <form onSubmit={handleSubmitTransaction} style={formStyle}>
+                <h4>Adicionar Transação Manual</h4>
                 <input
                     type="text"
                     placeholder="Descrição"
@@ -285,8 +180,8 @@ function FluxoDeCaixa() {
                     style={inputStyle}
                 />
                 <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={selectStyle}>
-                    <option value="entrada">Entrada</option>
                     <option value="saida">Saída</option>
+                    <option value="entrada">Entrada</option>
                 </select>
                 {tipo === 'saida' && (
                     <div style={checkboxContainerStyle}>
@@ -301,7 +196,7 @@ function FluxoDeCaixa() {
                 )}
                 <div style={{display: 'flex', gap: '10px'}}>
                     <button type="submit" style={submitButtonStyle}>
-                        {editingTransaction ? 'Salvar Alterações' : 'Adicionar'}
+                        {editingTransaction ? 'Salvar Alterações' : 'Adicionar Transação'}
                     </button>
                     {editingTransaction && (
                         <button type="button" onClick={resetForm} style={cancelButtonStyle}>
@@ -311,59 +206,28 @@ function FluxoDeCaixa() {
                 </div>
             </form>
 
-            <div style={buttonGroupStyle}>
-                <button onClick={handleFetchStudentPayments} style={{...submitButtonStyle, backgroundColor: '#007bff'}}>
-                    Entradas da Semana
-                </button>
-                <button onClick={handleFetchMonthlyPayments} style={{...submitButtonStyle, backgroundColor: '#007bff'}}>
-                    Entradas do Mês
-                </button>
-                <button onClick={handleFetchAnnualPayments} style={{...submitButtonStyle, backgroundColor: '#007bff'}}>
-                    Entradas do Ano
-                </button>
-            </div>
-            <small style={{display: 'block', marginTop: '5px', color: '#ccc'}}>Adiciona total de mensalidades no fluxo de caixa.</small>
-
             <hr style={dividerStyle} />
             
-            <button onClick={handleNavigateToExport} style={exportButtonStyle}>
-                Exportar para Planilha
-            </button>
-            
-            <button onClick={handleDeleteMonthData} style={{...deleteButtonStyle, width: '100%', padding: '12px', marginTop: '10px'}}>
-                Limpar Dados do Mês
-            </button>
-
-            <h3 style={listaTitleStyle}>Despesas Fixas</h3>
+            <h3 style={listaTitleStyle}>Transações de {meses[mesSelecionado]} de {anoSelecionado}</h3>
             <ul style={listStyle}>
-                {despesasFixas.map(transacao => (
-                    <li key={transacao.id} style={{ ...listItemStyle, borderLeft: `5px solid #dc3545`, backgroundColor: 'rgba(220, 53, 69, 0.1)' }}>
-                        <div>
-                            <p style={itemText}>**{transacao.descricao}** - {formatCurrency(transacao.valor)}</p>
-                            <small style={itemDate}>Fixo</small>
-                        </div>
-                        <div style={buttonContainerStyle}>
-                            <button onClick={() => handleEditTransaction(transacao)} style={editButtonStyle}>Alterar</button>
-                            <button onClick={() => handleDeleteTransacao(transacao.id)} style={deleteButtonStyle}>Excluir</button>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-
-            <h3 style={listaTitleStyle}>Últimas Transações (Entradas e Saídas Variáveis)</h3>
-            <ul style={listStyle}>
-                {entradas.concat(saidas).sort((a, b) => b.data.toDate() - a.data.toDate()).map(transacao => (
+                {transacoesFiltradas.map(transacao => (
                     <li key={transacao.id} style={{ ...listItemStyle, borderLeft: `5px solid ${transacao.tipo === 'entrada' ? 'green' : 'red'}` }}>
                         <div>
-                            <p style={itemText}>**{transacao.descricao}** - {formatCurrency(transacao.valor)}</p>
-                            <small style={itemDate}>{transacao.data.toDate().toLocaleDateString('pt-BR')}</small>
+                            <p style={itemText}>{transacao.descricao}</p>
+                            <small style={itemDate}>{formatDate(transacao.data)}</small>
                         </div>
-                        <div style={buttonContainerStyle}>
-                            <button onClick={() => handleEditTransaction(transacao)} style={editButtonStyle}>Alterar</button>
-                            <button onClick={() => handleDeleteTransacao(transacao.id)} style={deleteButtonStyle}>Excluir</button>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                            <span style={{fontWeight: 'bold'}}>{formatCurrency(transacao.valor)}</span>
+                            {!transacao.nome && (
+                                <div style={buttonContainerStyle}>
+                                    <button onClick={() => handleEditTransaction(transacao)} style={editButtonStyle}>Alterar</button>
+                                    <button onClick={() => handleDeleteTransacao(transacao.id, !!transacao.nome)} style={deleteButtonStyle}>Excluir</button>
+                                </div>
+                            )}
                         </div>
                     </li>
                 ))}
+                {transacoesFiltradas.length === 0 && <p style={{color: 'black'}}>Nenhuma transação encontrada para este período.</p>}
             </ul>
 
             <button onClick={() => navigate('/dashboard')} style={backButtonStyle}>Voltar para o Painel</button>
@@ -372,65 +236,32 @@ function FluxoDeCaixa() {
 }
 
 // Estilos
-const containerStyle = {
-    padding: '20px', maxWidth: '600px', margin: 'auto', textAlign: 'center', fontFamily: 'sans-serif',
-    border: '2px solid #FFD700', borderRadius: '15px', boxShadow: '0 0 20px #FFD700',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)', position: 'relative', color: 'white'
+const containerStyle = { 
+    padding: '20px', maxWidth: '800px', margin: 'auto', textAlign: 'center', fontFamily: 'sans-serif', 
+    border: '2px solid #FFD700', borderRadius: '15px', boxShadow: '0 0 20px #FFD700', 
+    backgroundColor: '#ffffff', // Fundo branco
+    color: '#333333' // Cor de texto geral mais escura
 };
 const logoStyle = { width: '150px', marginBottom: '10px' };
-const titleStyle = { color: '#FFD700', textShadow: '0 0 10px #FFD700' };
-const resumoStyle = { marginBottom: '20px', padding: '15px', border: '1px solid #FFD700', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.1)' };
+const titleStyle = { color: '#000000', textShadow: 'none' }; // Título preto, sem sombra
+const resumoStyle = { marginBottom: '20px', padding: '15px', border: '1px solid #FFD700', borderRadius: '10px', backgroundColor: '#f8f8f8' }; // Fundo claro para o resumo
 const resumoItemStyle = { margin: '5px 0', fontSize: '1.2em' };
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' };
-const inputStyle = { padding: '10px', borderRadius: '5px', border: '1px solid #ccc' };
-const selectStyle = { padding: '10px', borderRadius: '5px', border: '1px solid #ccc' };
+const formStyle = { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', padding: '20px', border: '1px solid #cccccc', borderRadius: '10px', backgroundColor: '#f0f0f0', color: '#333333' }; // Fundo claro para o formulário, letras escuras
+const inputStyle = { padding: '10px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#ffffff', color: '#000000' }; // Input com fundo branco e letras pretas
+const selectStyle = { padding: '10px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#ffffff', color: '#000000' }; // Select com fundo branco e letras pretas
 const submitButtonStyle = { padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
 const dividerStyle = { borderTop: '1px solid #FFD700', margin: '20px 0' };
-const listaTitleStyle = { color: '#FFD700' };
+const listaTitleStyle = { color: '#000000' }; // Título da lista preto
 const listStyle = { listStyleType: 'none', padding: '0' };
-const listItemStyle = {
-    padding: '15px', border: '1px solid #FFD700', borderRadius: '10px', marginBottom: '10px',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center', textAlign: 'left'
-};
-const itemText = { margin: '0', fontSize: '1em' };
-const itemDate = { margin: '0', fontSize: '0.8em', color: '#ccc' };
-const deleteButtonStyle = {
-    padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none',
-    borderRadius: '5px', cursor: 'pointer'
-};
-const backButtonStyle = {
-    padding: '15px', backgroundColor: '#dc3545', color: 'white', border: 'none',
-    borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-};
-const exportButtonStyle = {
-    padding: '12px', backgroundColor: '#4CAF50', color: 'white', border: 'none',
-    borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '20px',
-};
-const checkboxContainerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    color: '#FFD700'
-};
-const buttonGroupStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '10px',
-    marginTop: '15px'
-};
-const buttonContainerStyle = {
-    display: 'flex',
-    gap: '10px',
-};
-const editButtonStyle = {
-    padding: '5px 10px', backgroundColor: '#007bff', color: 'white', border: 'none',
-    borderRadius: '5px', cursor: 'pointer'
-};
-const cancelButtonStyle = {
-    padding: '10px', backgroundColor: '#dc3545', color: 'white', border: 'none',
-    borderRadius: '5px', cursor: 'pointer'
-};
+const listItemStyle = { padding: '15px', border: '1px solid #FFD700', borderRadius: '10px', marginBottom: '10px', backgroundColor: '#f8f8f8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', color: '#333333' }; // Item da lista com fundo claro e letras escuras
+const itemText = { margin: '0', fontSize: '1em', color: '#333333' }; // Texto do item preto
+const itemDate = { margin: '0', fontSize: '0.8em', color: '#555555' }; // Data do item cinza escuro
+const deleteButtonStyle = { padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
+const backButtonStyle = { padding: '15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', width: '100%' };
+const checkboxContainerStyle = { display: 'flex', alignItems: 'center', gap: '10px', color: '#333333', justifyContent: 'center' }; // Checkbox com letras pretas
+const buttonContainerStyle = { display: 'flex', gap: '10px' };
+const editButtonStyle = { padding: '5px 10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
+const cancelButtonStyle = { padding: '10px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
+const filterContainerStyle = { display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' };
 
 export default FluxoDeCaixa;

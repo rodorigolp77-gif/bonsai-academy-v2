@@ -1,0 +1,73 @@
+.admin-container {
+    padding: 20px;
+    max-width: 900px;
+    margin: 20px auto;
+    font-family: Arial, sans-serif;
+}
+
+.admin-header {
+    text-align: center;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+.admin-header h1 { margin: 0; color: #333; }
+.admin-header p { color: #777; font-size: 1.1em; }
+
+.content-section {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.content-section-disabled {
+    background-color: #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    color: #6c757d;
+    text-align: center;
+}
+.content-section h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    color: #0056b3;
+}
+
+.add-form { display: flex; gap: 10px; margin-bottom: 20px; }
+.add-form input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+.add-form button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 1em; transition: background-color 0.2s; }
+.add-form button:hover { background-color: #218838; }
+.add-form button:disabled { background-color: #aaa; cursor: not-allowed; }
+.plan-form { display: grid; grid-template-columns: 2fr 3fr 1fr; }
+
+.item-list { margin-top: 20px; }
+.item-list.categories { display: flex; flex-wrap: wrap; gap: 10px; }
+.list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: #fff; border: 1px solid #eee; border-radius: 5px; margin-bottom: 8px; }
+.list-item span { font-weight: bold; }
+.list-item small { display: block; color: #6c757d; font-size: 0.85em; margin-top: 4px; font-weight: normal; }
+.list-item.category, .list-item.plan { cursor: pointer; transition: all 0.2s ease-in-out; border: 2px solid transparent; }
+.list-item.category:hover, .list-item.plan:hover { border-color: #007bff; background-color: #f0f8ff; }
+.list-item.category.selected, .list-item.plan.selected { border-color: #007bff; background-color: #e6f3ff; box-shadow: 0 0 10px rgba(0, 123, 255, 0.3); }
+
+.delete-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2em; }
+.delete-btn:hover { color: #c82333; }
+.error-message { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+
+/* ===== NOVOS ESTILOS PARA EXERCÍCIOS ===== */
+.exercise-form {
+    display: grid;
+    grid-template-columns: 3fr 1fr 1fr 1fr 3fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.exercise-list {
+    margin-top: 20px;
+}
+
+.exercise-item {
+    background-color: #f0f8ff; /* Fundo azul claro para destacar */
+}

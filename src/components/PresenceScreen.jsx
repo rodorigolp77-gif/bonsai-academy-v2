@@ -1,7 +1,6 @@
 // src/components/PresenceScreen.jsx
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
+import { db } from "../firebaseConfig";import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import bonsaiLogo from '../assets/bonsai_logo.png';
 
