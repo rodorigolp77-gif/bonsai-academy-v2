@@ -11,7 +11,7 @@ const diasDaSemana = [
     { valor: 2, nome: 'Terça-feira' },
     { valor: 3, nome: 'Quarta-feira' },
     { valor: 4, nome: 'Quinta-feira' },
-    { valor: 5, nome: 'Sexta-feira' },
+    { valor: 5, nome: 'Sexta-feira' }, 
     { valor: 6, nome: 'Sábado' },
     { valor: 7, nome: 'Domingo' },
 ];

@@ -8,7 +8,7 @@ import bonsaiLogo from '../assets/bonsai_logo.png';
 function StudentPresenceScreen() {
     const [searchTerm, setSearchTerm] = useState('');
     const [records, setRecords] = useState([]);
-    const [message, setMessage] = useState('');
+    const [message, setMessage] = useState(''); 
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 

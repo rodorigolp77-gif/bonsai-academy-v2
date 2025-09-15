@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 function ExportPage() {
     const [transacoes, setTransacoes] = useState([]);
     const navigate = useNavigate();
-
+ 
     useEffect(() => {
         const fetchAllTransacoes = async () => {
             try {

@@ -1,4 +1,4 @@
-// src/components/GerenciarPlanosDeTreino.jsx
+ // src/components/GerenciarPlanosDeTreino.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

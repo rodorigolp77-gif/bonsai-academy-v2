@@ -1,57 +1,63 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext'; // Importa nosso hook de autenticação
+import { useAuth } from './contexts/AuthContext';
 
-// --- Páginas e Componentes ---
+// --- PÁGINAS E COMPONENTES ---
+// Públicos
 import LoginPage from './components/LoginPage';
+
+// De Aluno
 import StudentDashboard from './components/StudentDashboard';
-import Dashboard from './components/Dashboard'; // Este é o seu Dashboard de Admin
-// Lembre-se de importar todos os outros componentes que você usa nas rotas!
-// Ex: import RegisterStudent from './components/RegisterStudent';
+
+// De Professor
+import ProfessorDashboard from './components/ProfessorDashboard';
+import GerenciarMeusVideos from './components/GerenciarMeusVideos';
+
+// De Administrador
+import Dashboard from './components/Dashboard';
+import RegisterStudent from './components/RegisterStudent';
+import ListaAlunos from './components/ListaAlunos';
+import StudentDetails from './components/StudentDetails';
+import PaymentScreen from './components/PaymentScreen';
+import FluxoDeCaixa from './components/FluxoDeCaixa';
+import GerenciarSaude from './components/GerenciarSaude';
+import CheckinScreen from './components/CheckinScreen';
+import PresenceScreen from './components/PresenceScreen';
+import GerenciarPlanos from './components/GerenciarPlanos';
+import GerenciarEventos from './components/GerenciarEventos';
+import GerenciarVideos from './components/GerenciarVideos';
+import GerenciarResultados from './components/GerenciarResultados';
+import GerenciarCategorias from './components/GerenciarCategorias';
+import GerenciarAvisos from './components/GerenciarAvisos';
+import GerenciarAulas from './components/GerenciarAulas';
+// Adicione outros imports se necessário
 
 import './App.css';
 
-// --- COMPONENTES AUXILIARES (definidos fora para melhor performance) ---
+// --- COMPONENTES AUXILIARES ---
 
-// Componente para proteger rotas que exigem login e um perfil específico
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const { currentUser, userRole, loading } = useAuth();
-
-    if (loading) {
-        return <div className="loading-screen">Carregando...</div>;
-    }
-    if (!currentUser) {
-        return <Navigate to="/login" replace />;
-    }
+    if (loading) return <div className="loading-screen">Carregando...</div>;
+    if (!currentUser) return <Navigate to="/login" replace />;
     if (allowedRoles && !allowedRoles.includes(userRole)) {
-        // Se o perfil não for permitido, redireciona para a página principal do perfil dele
         if (userRole === 'admin') return <Navigate to="/dashboard" replace />;
         if (userRole === 'aluno') return <Navigate to="/aluno/dashboard" replace />;
-        return <Navigate to="/" replace />; 
+        if (userRole === 'professor') return <Navigate to="/professor/dashboard" replace />;
+        return <Navigate to="/" replace />;
     }
     return children;
 };
 
-// Componente para redirecionar o usuário para a página correta após o login
 const MainRedirect = () => {
     const { currentUser, userRole, loading } = useAuth();
-
-    if (loading) {
-      return <div className="loading-screen">Verificando permissões...</div>;
-    }
-    if (!currentUser) {
-      return <Navigate to="/login" replace />;
-    }
-
+    if (loading) return <div className="loading-screen">Verificando permissões...</div>;
+    if (!currentUser) return <Navigate to="/login" replace />;
     if (userRole === 'admin') return <Navigate to="/dashboard" replace />;
     if (userRole === 'aluno') return <Navigate to="/aluno/dashboard" replace />;
-    // Adicione outros perfis se necessário, ex: 'professor'
-    // if (userRole === 'professor') return <Navigate to="/professor/dashboard" replace />;
-    
-    // Caso o perfil não seja reconhecido, mostra uma mensagem.
-    return <div>Perfil de usuário não reconhecido. Por favor, contate o suporte.</div>;
+    if (userRole === 'professor') return <Navigate to="/professor/dashboard" replace />;
+    return <div>Perfil de usuário não reconhecido. Contate o suporte.</div>;
 };
-
 
 // --- COMPONENTE PRINCIPAL DO APLICATIVO ---
 
@@ -62,39 +68,34 @@ function App() {
                 {/* Rota Pública */}
                 <Route path="/login" element={<LoginPage />} />
 
-                {/* Rota Raiz: Redireciona o usuário logado para seu respectivo dashboard */}
+                {/* Rota Raiz */}
                 <Route path="/" element={<MainRedirect />} />
 
                 {/* Rotas de Aluno */}
-                <Route 
-                    path="/aluno/dashboard" 
-                    element={
-                        <ProtectedRoute allowedRoles={['aluno', 'professor']}>
-                            <StudentDashboard />
-                        </ProtectedRoute>
-                    } 
-                />
+                <Route path="/aluno/dashboard" element={<ProtectedRoute allowedRoles={['aluno', 'professor']}><StudentDashboard /></ProtectedRoute>} />
 
-                {/* Rotas de Admin */}
-                <Route 
-                    path="/dashboard" 
-                    element={
-                        <ProtectedRoute allowedRoles={['admin']}>
-                            <Dashboard />
-                        </ProtectedRoute>
-                    } 
-                />
-                
-                {/* Adicione aqui TODAS as suas outras rotas protegidas. Exemplo:
-                <Route 
-                    path="/register-student" 
-                    element={
-                        <ProtectedRoute allowedRoles={['admin']}>
-                            <RegisterStudent />
-                        </ProtectedRoute>
-                    } 
-                />
-                */}
+                {/* Rotas de Professor */}
+                <Route path="/professor/dashboard" element={<ProtectedRoute allowedRoles={['professor']}><ProfessorDashboard /></ProtectedRoute>} />
+                <Route path="/professor/gerenciar-videos" element={<ProtectedRoute allowedRoles={['professor']}><GerenciarMeusVideos /></ProtectedRoute>} />
+
+                {/* === ROTAS DE ADMINISTRADOR === */}
+                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Dashboard /></ProtectedRoute>} />
+                <Route path="/register-student" element={<ProtectedRoute allowedRoles={['admin']}><RegisterStudent /></ProtectedRoute>} />
+                <Route path="/lista-alunos" element={<ProtectedRoute allowedRoles={['admin']}><ListaAlunos /></ProtectedRoute>} />
+                <Route path="/student-details/:id" element={<ProtectedRoute allowedRoles={['admin']}><StudentDetails /></ProtectedRoute>} />
+                <Route path="/payments/:id" element={<ProtectedRoute allowedRoles={['admin']}><PaymentScreen /></ProtectedRoute>} />
+                <Route path="/fluxo-de-caixa" element={<ProtectedRoute allowedRoles={['admin']}><FluxoDeCaixa /></ProtectedRoute>} />
+                <Route path="/gerenciar-saude" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarSaude /></ProtectedRoute>} />
+                <Route path="/checkin" element={<ProtectedRoute allowedRoles={['admin']}><CheckinScreen /></ProtectedRoute>} />
+                <Route path="/presence" element={<ProtectedRoute allowedRoles={['admin']}><PresenceScreen /></ProtectedRoute>} />
+                <Route path="/gerenciar-planos" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarPlanos /></ProtectedRoute>} />
+                <Route path="/gerenciar-eventos" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarEventos /></ProtectedRoute>} />
+                <Route path="/gerenciar-videos" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarVideos /></ProtectedRoute>} />
+                <Route path="/gerenciar-resultados" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarResultados /></ProtectedRoute>} />
+                <Route path="/gerenciar-categorias" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarCategorias /></ProtectedRoute>} />
+                <Route path="/gerenciar-avisos" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarAvisos /></ProtectedRoute>} />
+                <Route path="/gerenciar-aulas" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarAulas /></ProtectedRoute>} />
+
             </Routes>
         </Router>
     );

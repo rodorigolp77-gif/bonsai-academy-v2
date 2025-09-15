@@ -1,4 +1,4 @@
-// src/components/Login.jsx
+ // src/components/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';

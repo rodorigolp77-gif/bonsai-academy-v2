@@ -1,4 +1,4 @@
-// src/components/Receipt.jsx
+ // src/components/Receipt.jsx
 import React from 'react';
 import bonsaiLogo from '../assets/logorecibo.png';
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { collection, query, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from "../firebaseConfig";
 import { FaSearch, FaDollarSign } from 'react-icons/fa';

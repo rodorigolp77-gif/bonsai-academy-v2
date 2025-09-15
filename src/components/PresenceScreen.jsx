@@ -1,4 +1,4 @@
-// src/components/PresenceScreen.jsx
+ // src/components/PresenceScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { db } from "../firebaseConfig";import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';

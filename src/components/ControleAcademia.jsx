@@ -8,7 +8,7 @@ import bonsaiLogo from '../assets/bonsai_logo.png';
 const SECURITY_PASSWORD = 'somosem5';
 
 const modalidades = [
-    'jiu-jitsu-kids', 'jiu-jitsu-feminino', 'jiu-jitsu-adulto',
+    'jiu-jitsu-kids', 'jiu-jitsu-feminino', 'jiu-jitsu-adulto', 
     'capoeira', 'taekwondo', 'fitness'
 ];
 const faixas = ['branca', 'cinza', 'amarela', 'laranja', 'verde', 'roxa', 'marrom', 'preta'];

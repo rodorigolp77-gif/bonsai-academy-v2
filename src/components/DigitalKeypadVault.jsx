@@ -8,7 +8,7 @@ const DigitalKeypadVault = ({ alunoId, setAlunoId, onCheckin, onAdminAccess }) =
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = () => { 
     setAlunoId(alunoId.slice(0, -1));
   };
 

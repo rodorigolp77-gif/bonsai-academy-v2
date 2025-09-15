@@ -10,7 +10,7 @@ import './CheckinScreen.css';
 const SECURITY_PASSWORD = 'somosem5';
 
 const messages = {
-    pt: {
+    pt: { 
         placeholder: "ID",
         checkinError: "ID incorreto.",
         invalidIdLength: "O ID deve ter 4 dígitos.",

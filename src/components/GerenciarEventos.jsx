@@ -1,4 +1,4 @@
-// src/components/GerenciarEventos.jsx
+ // src/components/GerenciarEventos.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

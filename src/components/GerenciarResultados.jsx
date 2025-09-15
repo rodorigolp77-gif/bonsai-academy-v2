@@ -1,4 +1,4 @@
-// src/components/GerenciarResultados.jsx
+ // src/components/GerenciarResultados.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

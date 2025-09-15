@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { db } from "../firebaseConfig";
 // No topo do seu arquivo GerenciarVideos.jsx
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, orderBy, query } from 'firebase/firestore';

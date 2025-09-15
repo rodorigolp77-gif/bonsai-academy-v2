@@ -13,7 +13,7 @@ function GerenciarAvisos() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // Estados para o formulário
+    // Estados para o formulário 
     const [titulo, setTitulo] = useState('');
     const [mensagem, setMensagem] = useState('');
     const [isSaving, setIsSaving] = useState(false);

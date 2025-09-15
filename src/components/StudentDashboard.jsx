@@ -14,7 +14,7 @@ const StudentDashboard = ({ user }) => {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
+ 
     useEffect(() => {
         const fetchAllData = async () => {
             // Usa a prop 'user' diretamente, sem precisar chamar auth.currentUser

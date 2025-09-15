@@ -1,4 +1,4 @@
-// src/components/PaymentSearch.jsx
+ // src/components/PaymentSearch.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bonsaiLogo from '../assets/bonsai_logo.png';

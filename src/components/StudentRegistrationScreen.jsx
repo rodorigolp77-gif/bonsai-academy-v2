@@ -5,10 +5,10 @@ import { db } from '../firebaseConfig';
 import { useNavigate } from 'react-router-dom';
 
 const messages = {
-    pt: {
+    pt: { 
         title: "Cadastro de Aluno",
         name_label: "Nome:",
-        id_label: "ID do Aluno (4 dígitos):",
+        id_label: "ID do Aluno (4 dígitos):", 
         modality_label: "Modalidade:",
         due_date_label: "Dia de Vencimento:",
         register_button: "Cadastrar Aluno",

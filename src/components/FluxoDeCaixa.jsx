@@ -6,7 +6,7 @@ import bonsaiLogo from '../assets/bonsai_logo.png';
 
 function FluxoDeCaixa() {
     const navigate = useNavigate();
-    const [transacoes, setTransacoes] = useState([]);
+    const [transacoes, setTransacoes] = useState([]); 
     const [descricao, setDescricao] = useState('');
     const [valor, setValor] = useState('');
     const [tipo, setTipo] = useState('saida');

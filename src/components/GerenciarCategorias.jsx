@@ -6,7 +6,7 @@ import { db } from "../firebaseConfig";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { FaListAlt, FaPlus, FaTrashAlt, FaSave, FaTimes } from 'react-icons/fa'; // IMPORT CORRIGIDO
 import './GerenciarCategorias.css';
-
+ 
 function GerenciarCategorias() {
     const navigate = useNavigate();
     const [modalidades, setModalidades] = useState([]);

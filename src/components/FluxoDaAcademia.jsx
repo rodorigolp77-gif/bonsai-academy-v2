@@ -6,7 +6,7 @@ function FluxoDaAcademia() {
     const navigate = useNavigate();
     
     // Dados de exemplo para ilustrar a estrutura
-    const dadosFinanceiros = {
+    const dadosFinanceiros = { 
         totalReceita: 5500.00,
         totalDespesa: 2150.00,
         receitaPorModalidade: {
