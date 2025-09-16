@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from "../firebaseConfig";
+import { db, auth } from "../firebaseConfig"; // AQUI ESTÁ A CORREÇÃO
 import { FaSignOutAlt } from 'react-icons/fa';
 import OverdueStudents from './OverdueStudents';
 import bonsaiLogo from '../assets/bonsai_logo.png';

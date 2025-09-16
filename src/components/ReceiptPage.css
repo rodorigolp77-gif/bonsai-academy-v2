@@ -1,0 +1,51 @@
+/* src/components/ReceiptPage.css */
+
+.receipt-page-container {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.receipt-actions-header {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn-print, .btn-back {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.btn-print {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.btn-back {
+    background-color: #f44336;
+    color: white;
+}
+
+/* Oculta os botões quando a página estiver sendo impressa */
+@media print {
+    .receipt-actions-header {
+        display: none;
+    }
+    
+    .receipt-page-container {
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* Garante que o recibo seja renderizado corretamente sem margens */
+    .receipt-content {
+        margin: 0;
+        box-shadow: none;
+    }
+}

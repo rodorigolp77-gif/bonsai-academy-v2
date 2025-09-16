@@ -30,6 +30,7 @@ import GerenciarResultados from './components/GerenciarResultados';
 import GerenciarCategorias from './components/GerenciarCategorias';
 import GerenciarAvisos from './components/GerenciarAvisos';
 import GerenciarAulas from './components/GerenciarAulas';
+import ReceiptPage from './components/ReceiptPage'; // Importação corrigida
 // Adicione outros imports se necessário
 
 import './App.css';
@@ -83,8 +84,7 @@ function App() {
                 <Route path="/register-student" element={<ProtectedRoute allowedRoles={['admin']}><RegisterStudent /></ProtectedRoute>} />
                 <Route path="/lista-alunos" element={<ProtectedRoute allowedRoles={['admin']}><ListaAlunos /></ProtectedRoute>} />
                 <Route path="/student-details/:id" element={<ProtectedRoute allowedRoles={['admin']}><StudentDetails /></ProtectedRoute>} />
-                <Route path="/payments/:id" element={<ProtectedRoute allowedRoles={['admin']}><PaymentScreen /></ProtectedRoute>} />
-                <Route path="/fluxo-de-caixa" element={<ProtectedRoute allowedRoles={['admin']}><FluxoDeCaixa /></ProtectedRoute>} />
+                <Route path="/payments/:studentId" element={<ProtectedRoute allowedRoles={['admin']}><PaymentScreen /></ProtectedRoute>} />                <Route path="/fluxo-de-caixa" element={<ProtectedRoute allowedRoles={['admin']}><FluxoDeCaixa /></ProtectedRoute>} />
                 <Route path="/gerenciar-saude" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarSaude /></ProtectedRoute>} />
                 <Route path="/checkin" element={<ProtectedRoute allowedRoles={['admin']}><CheckinScreen /></ProtectedRoute>} />
                 <Route path="/presence" element={<ProtectedRoute allowedRoles={['admin']}><PresenceScreen /></ProtectedRoute>} />
@@ -95,10 +95,10 @@ function App() {
                 <Route path="/gerenciar-categorias" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarCategorias /></ProtectedRoute>} />
                 <Route path="/gerenciar-avisos" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarAvisos /></ProtectedRoute>} />
                 <Route path="/gerenciar-aulas" element={<ProtectedRoute allowedRoles={['admin']}><GerenciarAulas /></ProtectedRoute>} />
-
+                <Route path="/receipt" element={<ReceiptPage />} />
             </Routes>
         </Router>
-    );asdf
+    );
 } 
 
 export default App;

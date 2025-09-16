@@ -10,7 +10,7 @@ import './CheckinScreen.css';
 const SECURITY_PASSWORD = 'somosem5';
 
 const messages = {
-    pt: { 
+    pt: {
         placeholder: "ID",
         checkinError: "ID incorreto.",
         invalidIdLength: "O ID deve ter 4 dígitos.",
@@ -65,6 +65,11 @@ function CheckinScreen() {
         setAlunoId(alunoId.slice(0, -1));
     };
 
+    const handleClear = () => {
+        setAlunoId('');
+        setFeedback('');
+    };
+
     const handleCheckin = async () => {
         setFeedback('');
         if (alunoId.length !== 4) {
@@ -76,13 +81,11 @@ function CheckinScreen() {
             const alunosRef = collection(db, 'alunos');
             let querySnapshot;
 
-            // 1. Tenta buscar o ID como TEXTO (string)
-            querySnapshot = await getDocs(query(alunosRef, where('aluno_id', '==', alunoId)));
+            const idAsNumber = parseInt(alunoId, 10);
+            querySnapshot = await getDocs(query(alunosRef, where('aluno_id', '==', idAsNumber)));
 
-            // 2. Se não encontrar, tenta buscar como NÚMERO
             if (querySnapshot.empty) {
-                const idAsNumber = parseInt(alunoId, 10);
-                querySnapshot = await getDocs(query(alunosRef, where('aluno_id', '==', idAsNumber)));
+                querySnapshot = await getDocs(query(alunosRef, where('aluno_id', '==', alunoId)));
             }
 
             if (querySnapshot.empty) {
@@ -91,10 +94,12 @@ function CheckinScreen() {
                 return;
             }
 
-            const alunoData = querySnapshot.docs[0].data();
+            const alunoDoc = querySnapshot.docs[0];
+            const alunoData = alunoDoc.data();
+
             await addDoc(collection(db, 'presencas'), {
-                // CORREÇÃO CRÍTICA: Garantir que o ID seja salvo como texto (string)
-                aluno_id: String(alunoData.aluno_id),
+                aluno_uid: alunoDoc.id,
+                aluno_id: alunoData.aluno_id,
                 nome: alunoData.nome,
                 data_presenca: serverTimestamp(),
             });
@@ -134,100 +139,85 @@ function CheckinScreen() {
     const handlePasswordCancel = () => {
         setIsPasswordModalOpen(false);
     };
-    
+
     return (
-        <div className="checkin-background">
-            <div className="vault-door">
-                <div className="vault-hinge left"></div>
-                <div className="vault-hinge right"></div>
-                
-                <div className="vault-center-panel">
-                    <div className="vault-screen-frame">
-                        <div className="vault-screen-top-light"></div>
-                        <div className="vault-screen-content">
-                            <div className="vault-screen-time">{currentDateTime}</div>
-                            <input
-                                type="password" 
-                                value={alunoId}
-                                readOnly
-                                placeholder={messages.pt.placeholder}
-                                className="vault-screen-input"
-                            />
-                            {feedback && <div className="vault-feedback-message">{feedback}</div>}
-                        </div>
-                    </div>
-
-                    <div className="vault-keypad-grid">
-                        <div className="keypad-row">
-                            <button onClick={() => handleNumberClick('1')} className="keypad-button num">1</button>
-                            <button onClick={() => handleNumberClick('2')} className="keypad-button num">2</button>
-                            <button onClick={() => handleNumberClick('3')} className="keypad-button num">3</button>
-                        </div>
-                        <div className="keypad-row">
-                            <button onClick={() => handleNumberClick('4')} className="keypad-button num">4</button>
-                            <button onClick={() => handleNumberClick('5')} className="keypad-button num">5</button>
-                            <button onClick={() => handleNumberClick('6')} className="keypad-button num">6</button>
-                        </div>
-                        <div className="keypad-row">
-                            <button onClick={() => handleNumberClick('7')} className="keypad-button num">7</button>
-                            <button onClick={() => handleNumberClick('8')} className="keypad-button num">8</button>
-                            <button onClick={() => handleNumberClick('9')} className="keypad-button num">9</button>
-                        </div>
-                        <div className="keypad-row">
-                            <button onClick={handleDelete} className="keypad-button fn red">X</button>
-                            <button onClick={() => handleNumberClick('0')} className="keypad-button num">0</button>
-                            <button onClick={handleCheckin} className="keypad-button fn green">+</button>
-                        </div>
-                        <div className="keypad-row full-width">
-                            <button onClick={handleCheckin} className="keypad-button enter">ENTER</button>
-                            <button onClick={handleDelete} className="keypad-button clear">CLEAR</button>
-                        </div>
-                    </div>
+        <div className="checkin-container-neon">
+            <img src={bonsaiLogo} alt="Bonsai Logo" className="bonsai-logo-checkin" />
+            <div className="security-panel">
+                <div className="security-screen">
+                    <p className="screen-armed">SYSTEM ARMED</p>
                 </div>
+                <div className="keypad-grid-neon">
+                    <button onClick={() => handleNumberClick('1')} className="keypad-button-neon">1</button>
+                    <button onClick={() => handleNumberClick('2')} className="keypad-button-neon">2</button>
+                    <button onClick={() => handleNumberClick('3')} className="keypad-button-neon">3</button>
+                    <button onClick={() => handleNumberClick('4')} className="keypad-button-neon">4</button>
+                    <button onClick={() => handleNumberClick('5')} className="keypad-button-neon">5</button>
+                    <button onClick={() => handleNumberClick('6')} className="keypad-button-neon">6</button>
+                    <button onClick={() => handleNumberClick('7')} className="keypad-button-neon">7</button>
+                    <button onClick={() => handleNumberClick('8')} className="keypad-button-neon">8</button>
+                    <button onClick={() => handleNumberClick('9')} className="keypad-button-neon">9</button>
+                    <button onClick={handleDelete} className="keypad-button-neon fn">DEL</button>
+                    <button onClick={() => handleNumberClick('0')} className="keypad-button-neon">0</button>
+                    <button onClick={handleCheckin} className="keypad-button-neon fn">ENT</button>
+                </div>
+            </div>
 
-                <div className="vault-handle left"></div>
-                <div className="vault-handle right"></div>
+            <div className="input-feedback-panel">
+                <div className="date-time-display">{currentDateTime}</div>
+                <input
+                    type="password"
+                    value={alunoId}
+                    readOnly
+                    placeholder={messages.pt.placeholder}
+                    className="checkin-input-neon"
+                />
+                <div className="feedback-message-neon">{feedback}</div>
+                <div className="actions-buttons-neon">
+                    <button onClick={handleCheckin} className="action-button-neon green-neon">ENTER</button>
+                    <button onClick={handleClear} className="action-button-neon red-neon">CLEAR</button>
+                </div>
+                <button onClick={openPasswordModal} className="admin-access-button">Acesso Admin</button>
             </div>
 
             {isModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h2 className="modal-title">Check-in realizado!</h2>
-                        <h1 className="modal-name">{checkedInStudentName}</h1>
-                        <p className="modal-message">
+                <div className="modal-overlay-neon">
+                    <div className="modal-content-neon">
+                        <h2 className="modal-title-neon">Check-in realizado!</h2>
+                        <h1 className="modal-name-neon">{checkedInStudentName}</h1>
+                        <p className="modal-message-neon">
                             {messages.pt.checkinMessage(checkedInStudentName)}<br/><br/>
                             {messages.ja.checkinMessage(checkedInStudentName)}
                         </p>
-                        <p className="modal-training-message">
+                        <p className="modal-training-message-neon">
                             {messages.pt.goodTraining}<br/>{messages.ja.goodTraining}
                         </p>
-                        <button onClick={closeModal} className="modal-close-button">OK</button>
+                        <button onClick={closeModal} className="modal-close-button-neon">OK</button>
                     </div>
                 </div>
             )}
 
             {isPasswordModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h4 className="modal-title">Digite a senha</h4>
+                <div className="modal-overlay-neon">
+                    <div className="modal-content-neon password-modal">
+                        <h4 className="modal-title-neon">Digite a senha</h4>
                         <form onSubmit={handlePasswordSubmit}>
                             <input
                                 type="password"
                                 value={passwordInput}
                                 onChange={(e) => setPasswordInput(e.target.value)}
-                                className="password-input"
+                                className="password-input-neon"
                                 autoFocus
                             />
-                            {passwordError && <p style={{ color: '#dc3545', fontSize: '0.9em' }}>{passwordError}</p>}
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                <button type="submit" className="modal-confirm-button">Confirmar</button>
-                                <button type="button" onClick={handlePasswordCancel} className="modal-cancel-button">Cancelar</button>
+                            {passwordError && <p className="error-message-neon">{passwordError}</p>}
+                            <div className="modal-buttons-neon">
+                                <button type="submit" className="action-button-neon green-neon">Confirmar</button>
+                                <button type="button" onClick={handlePasswordCancel} className="action-button-neon red-neon">Cancelar</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-            <button onClick={openPasswordModal} className="admin-access-button">Acesso Admin</button>
         </div>
     );
 }

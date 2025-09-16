@@ -1,0 +1,39 @@
+.receipt-paper {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    padding: 30px;
+    font-family: 'MS Mincho', 'Hiragino Mincho ProN', serif;
+    color: #000;
+    max-width: 800px;
+    margin: auto;
+}
+.receipt-content { border: 2px solid #000; padding: 20px; }
+.receipt-header { display: flex; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 15px; }
+.receipt-logo { width: 100px; height: 100px; margin-right: 20px; }
+.academy-details h1 { font-size: 2rem; margin: 0; }
+.academy-details p { margin: 2px 0; }
+.receipt-title { text-align: center; margin: 20px 0; }
+.receipt-title h2 { font-size: 2.5rem; margin: 0; letter-spacing: 0.5em; }
+.receipt-title h3 { margin: 0; font-weight: normal; }
+.customer-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 15px; }
+.customer-info p { margin: 5px 0; }
+.stamp-box { border: 2px solid #000; width: 120px; height: 120px; text-align: center; padding-top: 20px; }
+.items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.items-table th, .items-table td { border: 1px solid #000; padding: 8px; text-align: left; }
+.items-table th { background-color: #f2f2f2; }
+.items-table td:nth-child(2), .items-table td:nth-child(3), .items-table td:nth-child(4) { text-align: right; }
+.receipt-footer { border-top: 2px solid #000; padding-top: 15px; }
+.total-section { text-align: right; margin-top: 10px; }
+.total-section p { font-size: 1.5rem; font-weight: bold; }
+.total-section span { border-bottom: 3px double #000; padding: 5px; }
+.btn-print { margin-top: 20px; padding: 10px 20px; font-size: 1rem; cursor: pointer; }
+.receipt-modal-content { max-width: 900px; }
+
+/* Regras para Impressão */
+@media print {
+  body * { visibility: hidden; }
+  #receipt-to-print, #receipt-to-print * { visibility: visible; }
+  #receipt-to-print { position: absolute; left: 0; top: 0; width: 100%; }
+  .modal-close-button, .btn-print { display: none; }
+}

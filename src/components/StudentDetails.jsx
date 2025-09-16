@@ -54,7 +54,12 @@ const StudentDetails = () => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     const [payments, setPayments] = useState([]);
+    
+    // NOVOS ESTADOS PARA O HISTÓRICO DE PRESENÇAS
     const [attendance, setAttendance] = useState([]);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [totalPresences, setTotalPresences] = useState(0);
 
     const calculateAge = (dateOfBirth) => {
         const today = new Date();
@@ -100,11 +105,7 @@ const StudentDetails = () => {
                     photoUrl: data.photoUrl || ''
                 });
 
-                if (data.aluno_id) {
-                    const alunoIdAsString = String(data.aluno_id);
-                    fetchPayments(alunoIdAsString);
-                    fetchAttendance(alunoIdAsString);
-                }
+                fetchPayments(id);
             } else {
                 setError("Dados do aluno não encontrados.");
             }
@@ -116,25 +117,67 @@ const StudentDetails = () => {
         }
     }, [id]);
 
-    const fetchPayments = async (alunoId) => {
+    const fetchPayments = async (alunoDocId) => {
         try {
-            const q = query(collection(db, 'pagamentos'), where('aluno_id', '==', alunoId), orderBy('data_pagamento', 'desc'));
+            const q = query(
+                collection(db, 'pagamentos'),
+                where('aluno_uid', '==', alunoDocId),
+                orderBy('data_pagamento', 'desc')
+            );
             const querySnapshot = await getDocs(q);
-            setPayments(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const paymentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            const formattedPayments = paymentsData.map(p => {
+                const dataPagamento = p.data_pagamento && typeof p.data_pagamento.toDate === 'function' ? p.data_pagamento.toDate() : null;
+                return {
+                    ...p,
+                    data_pagamento: dataPagamento
+                };
+            });
+
+            setPayments(formattedPayments);
         } catch (err) {
             console.error("Erro ao buscar pagamentos:", err);
         }
     };
 
-    const fetchAttendance = async (alunoId) => {
+    const fetchAttendanceByDate = async () => {
+        if (!startDate || !endDate || !id) {
+            alert('Por favor, selecione as datas de início e fim.');
+            return;
+        }
+
         try {
-            const q = query(collection(db, 'presencas'), where('aluno_id', '==', alunoId), orderBy('data_presenca', 'desc'));
+            const presencesRef = collection(db, 'presencas');
+            const startTimestamp = Timestamp.fromDate(new Date(startDate + 'T00:00:00'));
+            const endTimestamp = Timestamp.fromDate(new Date(endDate + 'T23:59:59'));
+
+            const q = query(
+                presencesRef,
+                where('aluno_uid', '==', id),
+                where('data_presenca', '>=', startTimestamp),
+                where('data_presenca', '<=', endTimestamp),
+                orderBy('data_presenca', 'desc')
+            );
+            
             const querySnapshot = await getDocs(q);
-            setAttendance(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const attendanceData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            const formattedAttendance = attendanceData.map(a => {
+                const dataPresenca = a.data_presenca && typeof a.data_presenca.toDate === 'function' ? a.data_presenca.toDate() : null;
+                return {
+                    ...a,
+                    data_presenca: dataPresenca
+                };
+            });
+
+            setAttendance(formattedAttendance);
+            setTotalPresences(formattedAttendance.length);
         } catch (err) {
             console.error("Erro ao buscar presenças:", err);
         }
     };
+
 
     useEffect(() => {
         fetchStudentData();
@@ -303,6 +346,16 @@ const StudentDetails = () => {
     const handlePrintPayments = () => { /* ... */ };
     const handlePrintAttendance = () => { /* ... */ };
 
+    const handleReprintReceipt = (payment) => {
+        const receiptData = {
+            aluno: formData,
+            pagamento: payment,
+        };
+
+        localStorage.setItem('receiptData', JSON.stringify(receiptData));
+        navigate(`/receipt`);
+    };
+
     if (loading) return <div className="details-loading">Carregando dados do aluno...</div>;
     if (error) return <div className="details-error">Erro: {error}</div>;
 
@@ -398,44 +451,80 @@ const StudentDetails = () => {
                 )}
             </div>
 
+            {/* HISTÓRICO DE PAGAMENTOS */}
             <div className="details-section history-section">
                 <div className="history-header">
                     <h3>Histórico de Pagamentos</h3>
-                    <button onClick={handlePrintPayments} className="btn btn-print"><FaPrint /> Imprimir Pagamentos</button>
+                    {/* Botão de imprimir pagamentos removido */}
                 </div>
-                {payments.length > 0 ? (
-                    <table className="history-table">
-                        <thead><tr><th>Data</th><th>Valor</th><th>Método</th></tr></thead>
-                        <tbody>
-                            {payments.map(p => (
-                                <tr key={p.id}>
-                                    <td>{p.data_pagamento?.toDate().toLocaleDateString('pt-BR') || 'N/A'}</td>
-                                    <td>¥{p.valor_pago?.toLocaleString('ja-JP') || 'N/A'}</td>
-                                    <td>{p.metodo || 'N/A'}</td>
+                <div className="payment-history-scroll"> {/* Contêiner com barra de rolagem */}
+                    {payments.length > 0 ? (
+                        <table className="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Valor</th>
+                                    <th>Método</th>
+                                    <th>Ações</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : ( <p>Nenhum histórico de pagamento encontrado.</p> )}
+                            </thead>
+                            <tbody>
+                                {payments.map(p => (
+                                    <tr key={p.id}>
+                                        <td>{p.data_pagamento?.toLocaleDateString('pt-BR') || 'N/A'}</td>
+                                        <td>¥{p.valor_total?.toLocaleString('ja-JP') || 'N/A'}</td>
+                                        <td>{p.metodo_pagamento || 'N/A'}</td>
+                                        <td>
+                                            <button onClick={() => handleReprintReceipt(p)} className="btn btn-reprint"><FaPrint /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : ( <p>Nenhum histórico de pagamento encontrado.</p> )}
+                </div>
             </div>
 
+            {/* HISTÓRICO DE PRESENÇAS */}
             <div className="details-section history-section">
                 <div className="history-header">
                     <h3>Histórico de Presenças</h3>
                     <button onClick={handlePrintAttendance} className="btn btn-print"><FaPrint /> Imprimir Presenças</button>
                 </div>
-                {attendance.length > 0 ? (
-                    <table className="history-table">
-                        <thead><tr><th>Data</th></tr></thead>
-                        <tbody>
-                            {attendance.map(a => (
-                                <tr key={a.id}>
-                                    <td>{a.data_presenca?.toDate().toLocaleDateString('pt-BR') || 'N/A'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : ( <p>Nenhum histórico de presença encontrado.</p> )}
+                <div className="presence-search-bar">
+                    <span>De:</span>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                    />
+                    <span>Até:</span>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                    />
+                    <button onClick={fetchAttendanceByDate}>Pesquisar</button>
+                </div>
+                {attendance.length > 0 && (
+                    <div className="total-presences">
+                        Total de presenças no período: <strong>{totalPresences}</strong>
+                    </div>
+                )}
+                <div className="presence-history-scroll"> {/* Contêiner com barra de rolagem */}
+                    {attendance.length > 0 ? (
+                        <table className="history-table">
+                            <thead><tr><th>Data</th></tr></thead>
+                            <tbody>
+                                {attendance.map(a => (
+                                    <tr key={a.id}>
+                                        <td>{a.data_presenca?.toLocaleDateString('pt-BR') || 'N/A'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : ( <p>Nenhum histórico de presença encontrado para o período.</p> )}
+                </div>
             </div>
 
             {showConfirmModal && (

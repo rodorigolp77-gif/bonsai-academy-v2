@@ -17,11 +17,12 @@ import faixaVerde from '../assets/faixas/verde.png';
 import faixaRoxa from '../assets/faixas/roxa.png';
 import faixaMarrom from '../assets/faixas/marrom.png';
 import faixaPreta from '../assets/faixas/preta.png';
-// Caminhos corrigidos para as cordas (CAPOEIRA) - Corda laranja removida
+// Caminhos corrigidos para as cordas (CAPOEIRA)
 import cordaCrua from '../assets/cordas/corda-crua.jpg';
 import cordaAmarela from '../assets/cordas/cordaamarela.jpg';
+import cordaLaranja from '../assets/cordas/cordalaranja.jpg';
 import cordaAzul from '../assets/cordas/cordaazul.jpg';
-import cordaVerde from '../assets/cordas/cordaverde.jpg';
+import cordaVerde from '../assets/assets/cordas/cordaverde.jpg';
 import cordaRoxa from '../assets/cordas/cordaroxa.jpg';
 import cordaMarrom from '../assets/cordas/cordamarrom.jpg';
 import cordaPreta from '../assets/cordas/cordapreta.jpg';
@@ -34,23 +35,18 @@ import healthImg from '../assets/imagensbotoes/saude.png';
 
 import './StudentDashboard.css';
 
-const graduationImages = {
-    'jiu-jitsu': {
+const getFaixaImage = (faixa) => {
+    const faixas = {
         'branca': faixaBranca, 'cinza': faixaCinza, 'amarela': faixaAmarela,
         'laranja': faixaLaranja, 'verde': faixaVerde, 'roxa': faixaRoxa,
         'marrom': faixaMarrom, 'preta': faixaPreta,
-    },
-    'capoeira': {
-        'crua': cordaCrua, 'amarela': cordaAmarela,
+    };
+    const cordas = {
+        'crua': cordaCrua, 'amarela': cordaAmarela, 'laranja': cordaLaranja,
         'azul': cordaAzul, 'verde': cordaVerde, 'roxa': cordaRoxa,
-        'marrom': cordaMarrom, 'preta': cordaPreta,
-    }
-};
-
-const getFaixaImage = (modalidade, graduacao) => {
-    return graduationImages[modalidade] && graduationImages[modalidade][graduacao]
-        ? graduationImages[modalidade][graduacao]
-        : faixaBranca; // Faixa branca como fallback
+        'marrom': cordaMarrom, 'preta': cordaPreta
+    };
+    return faixas[faixa] || cordas[faixa] || faixaBranca;
 };
 
 const getGraduacaoLabel = (graduacao) => {
@@ -64,18 +60,11 @@ const getGraduacaoLabel = (graduacao) => {
 
 const getCordaLabel = (corda) => {
     const labels = {
-        'crua': 'Corda Crua', 'amarela': 'Corda Amarela',
+        'crua': 'Corda Crua', 'amarela': 'Corda Amarela', 'laranja': 'Corda Laranja',
         'azul': 'Corda Azul', 'verde': 'Corda Verde', 'roxa': 'Corda Roxa',
         'marrom': 'Corda Marrom', 'preta': 'Corda Preta',
     };
     return labels[corda] || 'Sem Corda';
-};
-
-const sampleMealPlan = {
-    breakfast: "Omelete com 2 ovos, queijo e espinafre",
-    lunch: "Filé de frango grelhado com arroz integral e salada variada",
-    dinner: "Salmão assado com batata-doce e brócolis",
-    snack: "Iogurte natural com frutas vermelhas"
 };
 
 const StudentDashboard = () => {
@@ -91,6 +80,7 @@ const StudentDashboard = () => {
     const [exercises, setExercises] = useState([]);
     const [showVideoModal, setShowVideoModal] = useState(false);
     const [videoUrl, setVideoUrl] = useState('');
+    const [dietModalOpen, setDietModalOpen] = useState(false);
     const [saudeSubTab, setSaudeSubTab] = useState('calculators');
     const [weight, setWeight] = useState('');
     const [height, setHeight] = useState('');
@@ -284,7 +274,7 @@ const StudentDashboard = () => {
                 <button onClick={() => setActiveTab('schedule')} className={`tab-button ${activeTab === 'schedule' ? 'active' : ''}`} style={{ backgroundImage: `url(${scheduleImg})` }}><span><FaCalendarAlt /> Horário de Aulas</span></button>
                 <button onClick={() => setActiveTab('fitness')} className={`tab-button ${activeTab === 'fitness' ? 'active' : ''}`} style={{ backgroundImage: `url(${fitnessImg})` }}><span><FaDumbbell /> Plano Fitness</span></button>
                 <button onClick={() => setActiveTab('videos')} className={`tab-button ${activeTab === 'videos' ? 'active' : ''}`} style={{ backgroundImage: `url(${videoImg})` }}><span><FaVideo /> Vídeo Aulas</span></button>
-                <button onClick={() => setActiveTab('health')} className={`tab-button ${activeTab === 'health' ? 'active' : ''}`} style={{ backgroundImage: `url(${healthImg})` }}><span><FaHeartbeat /> Saúde</span></button>
+                <button onClick={() => setActiveTab('health')} className={`tab-button ${activeTab === 'health' ? 'active' : ''}`} style={{ backgroundImage: `url(${dietImg})` }}><span><FaUtensils /> Dicas de Cardápio</span></button>
             </nav>
 
             <main className="dashboard-content">
@@ -344,7 +334,7 @@ const StudentDashboard = () => {
                                 <FaUtensils /> Cardápio
                             </button>
                         </div>
-
+                        
                         {saudeSubTab === 'calculators' && (
                             <div className="calculators-content">
                                 <div className="disclaimer-message">
